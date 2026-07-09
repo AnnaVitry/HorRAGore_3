@@ -1,0 +1,7 @@
+[theme]
+# Couleurs principales de l'univers "Chat Horror"
+primaryColor = "#8b0000"          # Rouge sang pour les boutons
+backgroundColor = "#111111"       # Noir profond pour l'arrière-plan
+secondaryBackgroundColor = "#1b1f24" # Gris très sombre pour la barre latérale et les bulles
+textColor = "#e2e8f0"             # Blanc cassé pour une lecture confortable
+font = "sans serif"
