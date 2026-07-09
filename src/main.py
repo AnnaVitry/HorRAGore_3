@@ -6,7 +6,6 @@ from fastapi import FastAPI, HTTPException
 # Import LangChain pour structurer les messages
 from langchain_core.messages import HumanMessage, SystemMessage
 
-# Import optionnel juste pour tester la BDD au démarrage (Ton code !)
 # Import du cerveau RAG (qui est à la racine du projet)
 from horror import SessionLocal, create_horragor_agent
 
@@ -37,8 +36,8 @@ async def lifespan(app: FastAPI):
     # 2. Chargement de l'Agent LangGraph et du routeur FAISS
     print("🧠 Chargement de l'Agent LangGraph et du routeur FAISS en RAM...")
     try:
-        # Le fichier parquet est à la racine, comme horror.py
-        chemin_parquet = "horragor_final_data.parquet"
+        # CORRECTION ICI : On pointe vers le dossier data/
+        chemin_parquet = "data/horragor_final_data.parquet"
         app.state.agent = create_horragor_agent(chemin_parquet)
         print("✅ Agent LangGraph opérationnel !")
     except Exception as e:
