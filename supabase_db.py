@@ -1,23 +1,24 @@
 import os
+from datetime import datetime
+
+import pandas as pd  # noqa: F401
+import polars as pl
 from sqlalchemy import (
-    create_engine,
+    BigInteger,
     Column,
+    Date,
+    Float,
+    ForeignKey,
     Integer,
     String,
     Text,
-    Date,
-    ForeignKey,
-    Float,
-    BigInteger,
-    text,  # <-- NOUVEAU : Permet d'exécuter des requêtes SQL brutes
+    create_engine,
+    text,  # Permet d'exécuter des requêtes SQL brutes
 )
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from dotenv import load_dotenv
-import polars as pl
-from datetime import datetime
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-# Chargement des variables d'environnement
-load_dotenv()
+# import du config avec les variables
+from src.config import PARQUET_FILE_PATH, SUPABASE_URL
 
 Base = declarative_base()
 
@@ -81,11 +82,7 @@ class Score(Base):
 # --- LOGIQUE D'ALIMENTATION ET EXPORT ---
 # =====================================================================
 
-DATABASE_URL = os.getenv("SUPABASE_URL")
-if not DATABASE_URL:
-    raise ValueError("ERREUR: La variable SUPABASE_URL est manquante dans le .env")
-
-engine = create_engine(DATABASE_URL)
+engine = create_engine(SUPABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
 
@@ -136,7 +133,7 @@ def save_to_supabase(reconciled_records: list):
             if rec.get("release_date"):
                 try:
                     dt = datetime.strptime(rec["release_date"], "%Y-%m-%d").date()
-                except:
+                except Exception:
                     pass
 
             new_media = Media(
@@ -209,7 +206,7 @@ if __name__ == "__main__":
 
     init_db()
 
-    fichier_donnees = "horragor_final_data.parquet"
+    fichier_donnees = PARQUET_FILE_PATH
 
     if os.path.exists(fichier_donnees):
         print(f"📖 Lecture du grimoire de données : {fichier_donnees}")

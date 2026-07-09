@@ -6,11 +6,13 @@ from fastapi import FastAPI, HTTPException
 # Import LangChain pour structurer les messages
 from langchain_core.messages import HumanMessage, SystemMessage
 
-# Import du cerveau RAG (qui est à la racine du projet)
-from horror import SessionLocal, create_horragor_agent
+# 1. Imports de la configuration et du graphe officiel
+from src.config import PARQUET_FILE_PATH
+from src.graph.pipeline import app_graph
 
 # Import de nos contrats de models
 from src.models.chat_models import ChatRequest, ChatResponse  # noqa: F401
+from src.tools.rag_tool import FastMovieRouter, SessionLocal  # noqa: F401
 
 # On importe le modèle Media depuis le fichier de BDD de tes amis
 from supabase_db import Media
@@ -33,19 +35,27 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"❌ Erreur critique lors de la connexion à la BDD : {e}")
 
-    # 2. Chargement de l'Agent LangGraph et du routeur FAISS
-    print("🧠 Chargement de l'Agent LangGraph et du routeur FAISS en RAM...")
+    # 2. Chargement de la mémoire éphémère (Routeur FAISS)
+    print("🧠 Chargement du Routeur FAISS en RAM...")
     try:
-        # CORRECTION ICI : On pointe vers le dossier data/
-        chemin_parquet = "data/horragor_final_data.parquet"
-        app.state.agent = create_horragor_agent(chemin_parquet)
-        print("✅ Agent LangGraph opérationnel !")
+        # La classe FastMovieRouter (située dans rag_tool) contient sa propre logique :
+        # Elle cherche le cache local sur le disque. S'il existe, elle le charge instantanément.
+        # Sinon, elle recalcule et sauvegarde le fichier d'index automatiquement.
+        app.state.movie_router = FastMovieRouter(PARQUET_FILE_PATH)
+        print("✅ Index FAISS opérationnel (Persistance vérifiée) !")
+    except Exception as e:
+        print(f"❌ Erreur au chargement du routeur FAISS : {e}")
+
+    # 3. Chargement du nouveau Multi-Agent LangGraph
+    print("🧠 Chargement de l'architecture Multi-Agent HorRAGor v3.0...")
+    try:
+        # On assigne directement notre nouveau graphe compilé !
+        app.state.agent = app_graph
+        print("✅ Système Multi-Agent opérationnel !")
     except Exception as e:
         print(f"❌ Erreur critique au chargement de l'agent : {e}")
-        app.state.agent = None
 
     yield
-
     print("🛑 Arrêt du serveur FastAPI.")
 
 

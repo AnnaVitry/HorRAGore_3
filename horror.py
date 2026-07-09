@@ -1,26 +1,18 @@
+import os
+
 import faiss
-import wikipedia
 import numpy as np
 import polars as pl
-import datetime
-import requests
-import os
-from bs4 import BeautifulSoup
-from typing import Annotated
 from dotenv import load_dotenv
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_ollama import ChatOllama, OllamaEmbeddings
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import START, MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode, tools_condition
 
 # --- IMPORTS POUR LA BASE DE DONNÉES RÉELLE ---
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from langchain_community.vectorstores import PGVector
-from supabase_db import Media, Score, ContentStore  # Import du MPD exact
-
-from langchain_ollama import ChatOllama, OllamaEmbeddings
-from langchain_core.messages import SystemMessage, HumanMessage
-from langchain_core.tools import tool
-from langgraph.graph import StateGraph, START, END, MessagesState
-from langgraph.prebuilt import ToolNode, tools_condition
-from langgraph.checkpoint.memory import MemorySaver
 
 # Initialisation de la connexion SQL
 load_dotenv()
@@ -123,7 +115,7 @@ class FastMovieRouter:
 
         match_idx = indices[0][0]
         # On passe de 1.5 à 0.6 ou 0.7 pour exiger une correspondance très forte
-        if match_idx != -1 and distances[0][0] < 0.6: 
+        if match_idx != -1 and distances[0][0] < 0.6:
             return {
                 "title": self.movie_titles[match_idx],
                 "id": self.movie_ids[match_idx],
@@ -136,147 +128,148 @@ class FastMovieRouter:
 # =====================================================================
 
 
-@tool
-def query_movie_metadata(movie_id: str) -> str:
-    """
-    TOOL 1 : Requêtes SQL Spécialisées.
-    Utilise cet outil pour obtenir les métadonnées exactes d'un film (réalisateur, année, budget, note).
-    Tu DOIS LUI FOURNIR L'IDENTIFIANT UNIQUE DU FILM (movie_id) obtenu via le routeur (ex: '74a5b6...').
-    """
-    print(f"   [SQL] Interrogation de Supabase pour l'horragor_id : {movie_id}...")
-    session = SessionLocal()
-    try:
-        # Requête SQL directe via SQLAlchemy basée sur NOTRE ID UNIQUE
-        media = session.query(Media).filter_by(horragor_id=movie_id).first()
-        if not media:
-            return f"Aucune métadonnée trouvée en base pour l'ID '{movie_id}'."
+# @tool
+# def query_movie_metadata(movie_id: str) -> str:
+#     """
+#     TOOL 1 : Requêtes SQL Spécialisées.
+#     Utilise cet outil pour obtenir les métadonnées exactes d'un film (réalisateur, année, budget, note).
+#     Tu DOIS LUI FOURNIR L'IDENTIFIANT UNIQUE DU FILM (movie_id) obtenu via le routeur (ex: '74a5b6...').
+#     """
+#     print(f"   [SQL] Interrogation de Supabase pour l'horragor_id : {movie_id}...")
+#     session = SessionLocal()
+#     try:
+#         # Requête SQL directe via SQLAlchemy basée sur NOTRE ID UNIQUE
+#         media = session.query(Media).filter_by(horragor_id=movie_id).first()
+#         if not media:
+#             return f"Aucune métadonnée trouvée en base pour l'ID '{movie_id}'."
 
-        # Récupération de la note depuis la table enfant
-        score_record = session.query(Score).filter_by(media_id=media.id).first()
-        note = score_record.value if score_record else "Non renseignée"
+#         # Récupération de la note depuis la table enfant
+#         score_record = session.query(Score).filter_by(media_id=media.id).first()
+#         note = score_record.value if score_record else "Non renseignée"
 
-        return (
-            f"Métadonnées extraites de la base SQL : "
-            f"Titre: {media.title}, Sortie: {media.release_date}, "
-            f"Univers: {media.category}, Budget: {media.budget}$, Note globale: {note}/10."
-        )
-    except Exception as e:
-        return f"Erreur lors de la requête SQL : {str(e)}"
-    finally:
-        session.close()
-
-
-@tool
-def find_similar_horror_movies(movie_id: str) -> str:
-    """
-    TOOL 2 : Le Recommandeur de Films Similaires.
-    Utilise cet outil UNIQUEMENT si l'utilisateur demande des recommandations ou des films qui ressemblent à un autre.
-    Tu DOIS LUI FOURNIR L'IDENTIFIANT UNIQUE DU FILM (movie_id).
-    """
-    print(f"   [PGVECTOR] Recherche de similarité cosinus pour l'ID : {movie_id}...")
-    session = SessionLocal()
-    try:
-        # 1. On récupère le synopsis original du film ciblé dans la base de données
-        media = session.query(Media).filter_by(horragor_id=movie_id).first()
-        if not media:
-            return (
-                "Film introuvable dans la base, impossible de faire une recommandation."
-            )
-
-        content = session.query(ContentStore).filter_by(media_id=media.id).first()
-        if not content or not content.synopsis:
-            return f"Aucun synopsis enregistré pour {media.title}. Recommandation vectorielle impossible."
-
-        synopsis_cible = content.synopsis
-
-        # 2. On prépare la connexion vectorielle
-        conn_string = SUPABASE_URL.replace("postgresql://", "postgresql+psycopg2://")
-        if conn_string.startswith("postgres://"):
-            conn_string = conn_string.replace("postgres://", "postgresql+psycopg2://")
-
-        embeddings = OllamaEmbeddings(model="nomic-embed-text")
-        vectorstore = PGVector(
-            connection_string=conn_string,
-            collection_name="horragor_vectors",
-            embedding_function=embeddings,
-            use_jsonb=True,
-        )
-
-        # 3. Recherche de similarité sur la base du synopsis !
-        results = vectorstore.similarity_search(synopsis_cible, k=4)
-
-        if not results:
-            return "Aucun film similaire trouvé dans la base vectorielle PGVector."
-
-        # On ignore le film lui-même s'il remonte en première position
-        recommandations = []
-        for doc in results:
-            if media.title not in doc.page_content:
-                recommandations.append(f"- {doc.page_content[:150]}...")
-
-        return (
-            f"Recommandations sémantiques basées sur l'ADN du film '{media.title}' :\n"
-            + "\n".join(recommandations)
-        )
-
-    except Exception as e:
-        return f"Erreur de connexion à l'extension vectorielle : {str(e)}"
-    finally:
-        session.close()
-
-@tool
-def scrape_detailed_synopsis(movie_title: str) -> str:
-    """
-    TOOL 3 : Scraping On-Demand.
-    Utilise cet outil SEULEMENT si l'utilisateur demande des anecdotes très précises, profondes ou un résumé complet.
-    Fournis le titre COMPLET du film en argument texte.
-    """
-    print(f"   [WEB] API Wikipédia activée pour : {movie_title}...")
-    try:
-        # On force la langue française
-        wikipedia.set_lang("fr")
-        
-        # 1. On effectue une vraie recherche pour trouver le titre exact de la page
-        resultats_recherche = wikipedia.search(movie_title)
-        
-        if not resultats_recherche:
-             return f"Aucune page Wikipédia trouvée pour le film '{movie_title}'."
-             
-        titre_officiel = resultats_recherche[0]
-        
-        # 2. On extrait le résumé proprement
-        summary = wikipedia.summary(titre_officiel, sentences=4)
-        return summary + "... [FIN DU SCRAPING]"
-        
-    except wikipedia.exceptions.DisambiguationError as e:
-        # Gère le cas où plusieurs films ont le même nom
-        return f"Le titre est trop ambigu. Wikipédia propose plusieurs pages : {e.options[:3]}"
-    except Exception as e:
-        return f"Erreur réseau ou page introuvable : {e}"
+#         return (
+#             f"Métadonnées extraites de la base SQL : "
+#             f"Titre: {media.title}, Sortie: {media.release_date}, "
+#             f"Univers: {media.category}, Budget: {media.budget}$, Note globale: {note}/10."
+#         )
+#     except Exception as e:
+#         return f"Erreur lors de la requête SQL : {str(e)}"
+#     finally:
+#         session.close()
 
 
-@tool
-def calculate_movie_age(release_year: int) -> str:
-    """
-    TOOL 4 : Le Calculateur Temporel.
-    Utilise cet outil pour calculer mathématiquement l'âge d'un film.
-    Passe uniquement l'année de sortie à 4 chiffres (ex: 1979) en argument.
-    """
-    print(f"   [MATH] Calcul temporel pour l'année : {release_year}...")
-    current_year = datetime.datetime.now().year
-    age = current_year - int(release_year)
-    return f"Le film a exactement {age} ans."
+# @tool
+# def find_similar_horror_movies(movie_id: str) -> str:
+#     """
+#     TOOL 2 : Le Recommandeur de Films Similaires.
+#     Utilise cet outil UNIQUEMENT si l'utilisateur demande des recommandations ou des films qui ressemblent à un autre.
+#     Tu DOIS LUI FOURNIR L'IDENTIFIANT UNIQUE DU FILM (movie_id).
+#     """
+#     print(f"   [PGVECTOR] Recherche de similarité cosinus pour l'ID : {movie_id}...")
+#     session = SessionLocal()
+#     try:
+#         # 1. On récupère le synopsis original du film ciblé dans la base de données
+#         media = session.query(Media).filter_by(horragor_id=movie_id).first()
+#         if not media:
+#             return (
+#                 "Film introuvable dans la base, impossible de faire une recommandation."
+#             )
+
+#         content = session.query(ContentStore).filter_by(media_id=media.id).first()
+#         if not content or not content.synopsis:
+#             return f"Aucun synopsis enregistré pour {media.title}. Recommandation vectorielle impossible."
+
+#         synopsis_cible = content.synopsis
+
+#         # 2. On prépare la connexion vectorielle
+#         conn_string = SUPABASE_URL.replace("postgresql://", "postgresql+psycopg2://")
+#         if conn_string.startswith("postgres://"):
+#             conn_string = conn_string.replace("postgres://", "postgresql+psycopg2://")
+
+#         embeddings = OllamaEmbeddings(model="nomic-embed-text")
+#         vectorstore = PGVector(
+#             connection_string=conn_string,
+#             collection_name="horragor_vectors",
+#             embedding_function=embeddings,
+#             use_jsonb=True,
+#         )
+
+#         # 3. Recherche de similarité sur la base du synopsis !
+#         results = vectorstore.similarity_search(synopsis_cible, k=4)
+
+#         if not results:
+#             return "Aucun film similaire trouvé dans la base vectorielle PGVector."
+
+#         # On ignore le film lui-même s'il remonte en première position
+#         recommandations = []
+#         for doc in results:
+#             if media.title not in doc.page_content:
+#                 recommandations.append(f"- {doc.page_content[:150]}...")
+
+#         return (
+#             f"Recommandations sémantiques basées sur l'ADN du film '{media.title}' :\n"
+#             + "\n".join(recommandations)
+#         )
+
+#     except Exception as e:
+#         return f"Erreur de connexion à l'extension vectorielle : {str(e)}"
+#     finally:
+#         session.close()
 
 
-@tool
-def horror_survival_simulator(synopsis: str) -> str:
-    """
-    TOOL 5 : Le Simulateur de Survie.
-    Outil ludique. Utilise cet outil si l'utilisateur demande s'il survivrait dans le film.
-    Passe un court résumé de l'intrigue en argument.
-    """
-    print("   [GAME] Lancement de la simulation de survie...")
-    return "Simulation terminée. Probabilité de survie : 4%. Cause probable : Mort atroce dans l'espace ou une cabane."
+# @tool
+# def scrape_detailed_synopsis(movie_title: str) -> str:
+#     """
+#     TOOL 3 : Scraping On-Demand.
+#     Utilise cet outil SEULEMENT si l'utilisateur demande des anecdotes très précises, profondes ou un résumé complet.
+#     Fournis le titre COMPLET du film en argument texte.
+#     """
+#     print(f"   [WEB] API Wikipédia activée pour : {movie_title}...")
+#     try:
+#         # On force la langue française
+#         wikipedia.set_lang("fr")
+
+#         # 1. On effectue une vraie recherche pour trouver le titre exact de la page
+#         resultats_recherche = wikipedia.search(movie_title)
+
+#         if not resultats_recherche:
+#             return f"Aucune page Wikipédia trouvée pour le film '{movie_title}'."
+
+#         titre_officiel = resultats_recherche[0]
+
+#         # 2. On extrait le résumé proprement
+#         summary = wikipedia.summary(titre_officiel, sentences=4)
+#         return summary + "... [FIN DU SCRAPING]"
+
+#     except wikipedia.exceptions.DisambiguationError as e:
+#         # Gère le cas où plusieurs films ont le même nom
+#         return f"Le titre est trop ambigu. Wikipédia propose plusieurs pages : {e.options[:3]}"
+#     except Exception as e:
+#         return f"Erreur réseau ou page introuvable : {e}"
+
+
+# @tool
+# def calculate_movie_age(release_year: int) -> str:
+#     """
+#     TOOL 4 : Le Calculateur Temporel.
+#     Utilise cet outil pour calculer mathématiquement l'âge d'un film.
+#     Passe uniquement l'année de sortie à 4 chiffres (ex: 1979) en argument.
+#     """
+#     print(f"   [MATH] Calcul temporel pour l'année : {release_year}...")
+#     current_year = datetime.datetime.now().year
+#     age = current_year - int(release_year)
+#     return f"Le film a exactement {age} ans."
+
+
+# @tool
+# def horror_survival_simulator(synopsis: str) -> str:
+#     """
+#     TOOL 5 : Le Simulateur de Survie.
+#     Outil ludique. Utilise cet outil si l'utilisateur demande s'il survivrait dans le film.
+#     Passe un court résumé de l'intrigue en argument.
+#     """
+#     print("   [GAME] Lancement de la simulation de survie...")
+#     return "Simulation terminée. Probabilité de survie : 4%. Cause probable : Mort atroce dans l'espace ou une cabane."
 
 
 # =====================================================================
