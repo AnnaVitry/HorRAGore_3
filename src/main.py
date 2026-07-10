@@ -1,4 +1,3 @@
-import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -81,7 +80,6 @@ async def chat_endpoint(request: ChatRequest):
     """
     Endpoint unique réceptionnant les questions de l'interface utilisateur.
     """
-    start_time = time.time()
 
     if not hasattr(app.state, "agent") or app.state.agent is None:
         raise HTTPException(status_code=500, detail="L'agent RAG n'est pas initialisé.")
