@@ -1,6 +1,7 @@
+import base64
+import os
 import random
 import time
-
 import requests
 import streamlit as st
 
@@ -33,59 +34,86 @@ LOADING_STEPS = [
 # Configuration de la page avec un layout adapté
 st.set_page_config(page_title="HorRAGor BOT", page_icon="🩸", layout="centered")
 
-# --- STYLE CSS PERSONNALISÉ ---
-st.markdown(
-    """
-    <style>
-    .horror-title {
-        font-family: 'Courier New', Courier, monospace;
-        color: #ff0000;
-        text-align: center;
-        text-shadow: 0 0 10px #8b0000, 0 0 20px #8b0000;
-        font-size: 3rem;
-        font-weight: bold;
-        margin-bottom: 0px;
-    }
-    .horror-subtitle {
-        text-align: center;
-        color: #8a8a8a;
-        font-style: italic;
-        margin-bottom: 25px;
-    }
-    .stSpinner > div {
-        border-top-color: #8b0000 !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+
+# --- INJECTION DES POLICES TYPOGRAPHIQUES PERSONNALISÉES ---
+def inject_custom_fonts():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # LIGNE À MODIFIER SI LE NOM DE TON FICHIER TTF CHANGE :
+    font_path = os.path.join(current_dir, "assets", "fonts", "Ghost Shadow.ttf")
+    
+    if not os.path.exists(font_path):
+        st.error(f"⚠️ Fichier de police introuvable : {font_path}")
+        return
+
+    with open(font_path, "rb") as font_file:
+        font_data = font_file.read()
+        font_base64 = base64.b64encode(font_data).decode("utf-8")
+
+    st.markdown(
+        f"""
+        <style>
+        @font-face {{
+            font-family: 'HorragorTheme';
+            src: url(data:font/ttf;charset=utf-8;base64,{font_base64}) format('truetype');
+        }}
+        
+        .titre-horragor {{
+            font-family: 'HorragorTheme', sans-serif !important;
+            font-size: 5rem;
+            color: #ff0000;
+            text-align: center;
+            text-shadow: 0 0 10px #8b0000, 0 0 20px #8b0000;
+            margin-bottom: 5px;
+            margin-top: -20px;
+        }}
+
+        .projet-lestat {{
+            font-family: 'HorragorTheme', sans-serif !important;
+            font-size: 3.5rem;
+            color: #bf0429;
+            text-align: center;
+            margin-top: 0px;
+        }}
+        
+        .horror-subtitle {{
+            text-align: center;
+            color: #8a8a8a;
+            font-style: italic;
+            margin-bottom: 30px;
+        }}
+        
+        .stSpinner > div {{
+            border-top-color: #8b0000 !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+# Appel immédiat de l'injection CSS
+inject_custom_fonts()
+
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.markdown(
-        "<h2 style='color: #8b0000; font-family: monospace;'>🚀 USCSS Prometheus</h2>",
-        unsafe_allow_html=True,
-    )
-    st.write("Projet de Groupe - RAG Horreur et SCI/FI")
+    st.markdown("<h2 class='projet-lestat'>⚜️ LESTAT ⚜️</h2>", unsafe_allow_html=True)
+    st.write("Projet de Anna :)")
     st.markdown("---")
     st.markdown("**Statut du Système :**")
 
     # Indicateur dynamique visuel dans la sidebar
     try:
-        # On tente une requête très rapide juste pour voir si le port écoute
         res = requests.get("http://localhost:8000/", timeout=0.5)
-        st.success("🟢 API FastAPI En Ligne")
-    except:
-        st.error("🔴 API FastAPI Hors-ligne")
+        st.success("💚 API FastAPI En Ligne")
+    except Exception:
+        st.error("❤️ API FastAPI Hors-ligne")
 
     st.markdown("---")
-    st.markdown(
-        "<small>Modèle : Architecture ReAct & Base Hybride Supabase</small>",
-        unsafe_allow_html=True,
-    )
+    st.markdown("<small>Modèle : Architecture ReAct & Base Hybride Supabase</small>", unsafe_allow_html=True)
+
 
 # --- CORPS PRINCIPAL DE L'INTERFACE ---
-st.markdown("<p class='horror-title'>🩸 HorRAGor 🛸</p>", unsafe_allow_html=True)
+st.markdown("<h1 class='titre-horragor'>HORRAGOR</h1>", unsafe_allow_html=True)
 st.markdown(
     "<p class='horror-subtitle'>L'agent qui sonde les abysses du cinéma, de la littérature sci/fi et du jeu vidéo d'horreur...</p>",
     unsafe_allow_html=True,
@@ -135,37 +163,27 @@ if st.session_state.processing and st.session_state.messages:
         # Étape A : On fait défiler les messages d'ambiance et monter la jauge (0% à 80%)
         for i, quote in enumerate(LOADING_STEPS):
             progress_text.markdown(f"*{quote}*")
-            # Calcule un pourcentage progressif basé sur l'étape actuelle
             current_percentage = int((i + 1) * (80 / len(LOADING_STEPS)))
             progress_bar.progress(current_percentage)
-            time.sleep(
-                0.5
-            )  # Petit délai pour laisser le temps de lire le lore d'horreur
+            time.sleep(0.5)
 
-        progress_text.markdown(
-            "⚡ *Établissement du contact avec le serveur d'outils...*"
-        )
+        progress_text.markdown("⚡ *Établissement du contact avec le serveur d'outils...*")
 
         # Étape B : Appel réel vers l'API FastAPI de ton binôme
         try:
-            # CORRECTION 1 : On ajoute un "user_id" fixe (ou généré) pour respecter le modèle Pydantic
             payload = {"user_id": "stream_user_1", "question": last_user_message}
-
             response = requests.post(BACKEND_URL, json=payload, timeout=45)
 
-            # Si le serveur a répondu, on pousse la jauge à 100% juste avant d'afficher
             progress_bar.progress(100)
             time.sleep(0.2)
 
             if response.status_code == 200:
-                # CORRECTION 2 : On cherche la clé "answer" et non "response"
                 answer = response.json().get("answer", "L'entité refuse de répondre...")
             else:
                 answer = f"⚠️ **Malédiction du Serveur** : Erreur HTTP {response.status_code}. Détail : {response.text}"
 
         except requests.exceptions.ConnectionError:
             progress_bar.progress(100)
-            # Pioche une phrase d'erreur d'horreur au hasard
             random_quote = random.choice(FASTAPI_ERROR_QUOTES)
             answer = f"{random_quote}\n\n*Veuillez vérifier que votre binôme a bien réveillé le serveur FastAPI.*"
         except Exception as e:
