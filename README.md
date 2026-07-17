@@ -163,5 +163,3 @@ L'interface web s'ouvrira dans votre navigateur. Vous pouvez maintenant dialogue
 ## 🤝 Contribuer
 
 Ouvrez une **Issue** pour discuter des changements ou des idées de nouvelles fonctionnalités avant de soumettre une **Pull Request**. Gardez à l'esprit la règle absolue du *Context Trimming* : le bot ne doit jamais halluciner !
-
-```
