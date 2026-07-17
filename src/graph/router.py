@@ -1,16 +1,20 @@
 from src.models.state import AgentState
 
 
-def should_continue_rag(state: AgentState):
-    """
-    Examine l'état après le passage de l'Agent RAG.
-    """
-    last_message = state["messages"][-1]
+def should_scrape_or_narrate(state: AgentState) -> str:
+    """Examine l'état actuel et décide d'aiguiller vers le Scraper ou la Narration."""
 
-    # 1. Si le RAG demande à utiliser la base de données (SQL ou PGVector)
-    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-        return "tools"
+    # On extrait le flag décisionnel écrit par le nœud RAG
+    is_sufficient = state.get("is_database_sufficient", True)
 
-    # 2. (Simplification) Une fois que le RAG a fini, on passe le relais à l'écrivain.
-    # Dans une version plus avancée, on pourrait vérifier ici si on doit dérouter vers le 'scraper'[cite: 60].
-    return "narration"
+    # Règle d'or LangGraph : On renvoie le nom exact de la prochaine destination
+    if is_sufficient:
+        print(
+            "🔮 [ROUTEUR] : Savoir local suffisant. Aiguillage direct vers l'Écrivain Gothique."
+        )
+        return "narration"
+
+    print(
+        "🕷️ [ROUTEUR] : Savoir local incomplet. Déviation du flux vers l'Enquêteur Web (Scraper)."
+    )
+    return "scraper"

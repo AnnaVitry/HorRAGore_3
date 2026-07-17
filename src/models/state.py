@@ -1,17 +1,21 @@
-import operator
-from typing import Annotated, Sequence
+from typing import Annotated, Any, Dict, List
 
 from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 from typing_extensions import TypedDict
 
 
 class AgentState(TypedDict):
-    """
-    L'état partagé par nos agents pour l'architecture HorRAGor v3.0.
-    Chaque agent lira et écrira dans cette structure.
-    """
+    """L'état de confiance (mémoire commune) partagé par tous les agents."""
 
-    # L'opérateur add permet d'accumuler les messages (historique) sans les écraser
-    messages: Annotated[Sequence[BaseMessage], operator.add]
+    # Historique complet des messages (géré par le reducer add_messages)
+    messages: Annotated[List[BaseMessage], add_messages]
 
-    # Nous pourrons ajouter ici d'autres clés plus tard (ex: 'verdict' pour un Juge)
+    # Données structurées et sémantiques récupérées en local (FAISS / Supabase)
+    local_lore: Dict[str, Any]
+
+    # Anecdotes et faits bruts récupérés sur le Web par le scraper
+    web_anecdotes: List[str]
+
+    # Flag décisionnel levé par le nœud RAG pour guider le routeur
+    is_database_sufficient: bool

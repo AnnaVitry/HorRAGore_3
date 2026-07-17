@@ -2,6 +2,7 @@ import base64
 import os
 import random
 import time
+
 import requests
 import streamlit as st
 
@@ -40,7 +41,7 @@ def inject_custom_fonts():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     # LIGNE À MODIFIER SI LE NOM DE TON FICHIER TTF CHANGE :
     font_path = os.path.join(current_dir, "assets", "fonts", "Ghost Shadow.ttf")
-    
+
     if not os.path.exists(font_path):
         st.error(f"⚠️ Fichier de police introuvable : {font_path}")
         return
@@ -87,8 +88,9 @@ def inject_custom_fonts():
         }}
         </style>
         """,
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
+
 
 # Appel immédiat de l'injection CSS
 inject_custom_fonts()
@@ -103,13 +105,16 @@ with st.sidebar:
 
     # Indicateur dynamique visuel dans la sidebar
     try:
-        res = requests.get("http://localhost:8000/", timeout=0.5)
+        res = requests.get("http://localhost:8000/", timeout=120.5)
         st.success("💚 API FastAPI En Ligne")
     except Exception:
         st.error("❤️ API FastAPI Hors-ligne")
 
     st.markdown("---")
-    st.markdown("<small>Modèle : Architecture ReAct & Base Hybride Supabase</small>", unsafe_allow_html=True)
+    st.markdown(
+        "<small>Modèle : Architecture ReAct & Base Hybride Supabase</small>",
+        unsafe_allow_html=True,
+    )
 
 
 # --- CORPS PRINCIPAL DE L'INTERFACE ---
@@ -167,7 +172,9 @@ if st.session_state.processing and st.session_state.messages:
             progress_bar.progress(current_percentage)
             time.sleep(0.5)
 
-        progress_text.markdown("⚡ *Établissement du contact avec le serveur d'outils...*")
+        progress_text.markdown(
+            "⚡ *Établissement du contact avec le serveur d'outils...*"
+        )
 
         # Étape B : Appel réel vers l'API FastAPI de ton binôme
         try:
