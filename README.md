@@ -57,17 +57,30 @@ HorRAGore_3/
 ### 1. Prérequis système
 
 * **Python 3.10+**
-* **Ollama** installé et lancé localement (`ollama serve`) avec les modèles téléchargés :
+* L'outil **`uv`** installé sur votre machine.
+* **Ollama** installé sur votre système (Moteur système indépendant de Python).
+* **Installation sous Linux (Ubuntu) :**
+```bash
+curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
+
+```
+
+
+* *(Pour Windows ou macOS, téléchargez l'installateur officiel sur [ollama.com](https://ollama.com))*
+
+
+
+### 2. Téléchargement des Modèles d'Intelligence Artificielle
+
+Une fois Ollama installé, téléchargez les modèles requis en tapant directement dans votre terminal :
+
 ```bash
 ollama pull llama3.2:3b
 ollama pull nomic-embed-text
 
 ```
 
-
-* L'outil **`uv`** installé sur votre machine.
-
-### 2. Cloner et préparer l'environnement
+### 3. Cloner et préparer l'environnement Python
 
 **🐧 Sous Linux / macOS :**
 
@@ -97,7 +110,7 @@ uv sync
 
 ```
 
-### 3. Configuration de l'environnement (`.env`)
+### 4. Configuration de l'environnement (`.env`)
 
 Créez un fichier `.env` à la racine du projet et ajoutez votre chaîne de connexion Supabase :
 
