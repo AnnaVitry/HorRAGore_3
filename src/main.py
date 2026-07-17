@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from langchain_core.messages import HumanMessage
+from langfuse.langchain import CallbackHandler
 
 # Import du graphe Multi-Agent compilé
 from src.graph.pipeline import app_graph
@@ -54,6 +55,10 @@ async def health_check():
     return {"status": "HorRAGor 3.0 est réveillé et prêt."}
 
 
+# Instancie le handler (il lira automatiquement tes variables d'environnement)
+langfuse_handler = CallbackHandler()
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat_endpoint(request: ChatRequest):
     """
@@ -61,14 +66,12 @@ async def chat_endpoint(request: ChatRequest):
     Le routage entre RAG, Scraper et Narration est géré par le graphe compilé.
     """
     try:
-        # Initialisation du flux avec le message utilisateur
         inputs = {"messages": [HumanMessage(content=request.question)]}
+        config = {
+            "configurable": {"thread_id": request.user_id},
+            "callbacks": [langfuse_handler],  # 👈 C'est ici que la magie opère
+        }
 
-        # Configuration pour le suivi (thread_id permet l'isolation des sessions)
-        config = {"configurable": {"thread_id": request.user_id}}
-
-        # Exécution du pipeline complet
-        # 'ainvoke' exécute le graphe de manière asynchrone
         result = await app.state.agent.ainvoke(inputs, config=config)
 
         # Le dernier message est obligatoirement la prose finale de la Narration

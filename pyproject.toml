@@ -25,4 +25,5 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "python-dotenv>=1.2.2",
     "wikipedia>=1.4.0",
+    "langfuse>=4.14.0",
 ]

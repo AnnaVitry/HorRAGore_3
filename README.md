@@ -55,6 +55,7 @@ HorRAGore_3/
 ## 🚀 Installation et Prérequis
 
 ### 1. Prérequis système
+Pour faire fonctionner HorRAGor v3.0, assure-toi d'avoir installé :
 
 * **Python 3.10+**
 * L'outil **`uv`** installé sur votre machine.
@@ -64,11 +65,27 @@ HorRAGore_3/
 curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
 
 ```
+*(Pour Windows ou macOS, téléchargez l'installateur officiel sur [ollama.com](https://ollama.com))*
+* **Docker** & Docker Compose
+* **Langfuse** Observability 
+Le système utilise Langfuse pour monitorer les appels LLM et le comportement des agents.
 
+Lancer l'infrastructure :
 
-* *(Pour Windows ou macOS, téléchargez l'installateur officiel sur [ollama.com](https://ollama.com))*
+```Bash
+cd path/to/your/langfuse-folder
+docker compose up -d
+```
 
+Configuration des clés :
+Une fois Langfuse lancé (accessible sur `http://localhost:3000`), récupère tes clés API et ajoute-les dans ton fichier `.env` à la racine de HorRAGore_3 :
 
+Extrait de code
+```python
+LANGFUSE_PUBLIC_KEY="pk-lf-..."
+LANGFUSE_SECRET_KEY="sk-lf-..."
+LANGFUSE_HOST="http://localhost:3000"
+```
 
 ### 2. Téléchargement des Modèles d'Intelligence Artificielle
 
