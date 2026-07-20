@@ -80,7 +80,7 @@ docker compose up -d
 Configuration des clés :
 Une fois Langfuse lancé (accessible sur `http://localhost:3000`), récupère tes clés API et ajoute-les dans ton fichier `.env` à la racine de HorRAGore_3 :
 
-Extrait de code
+Extrait de code :
 ```python
 LANGFUSE_PUBLIC_KEY="pk-lf-..."
 LANGFUSE_SECRET_KEY="sk-lf-..."
@@ -136,8 +136,6 @@ SUPABASE_URL="postgresql://utilisateur:motdepasse@hote:5432/postgres"
 
 ```
 
----
-
 ## ⚙️ Démarrage du Système
 
 Le lancement se fait en 3 étapes distinctes (chaque étape doit idéalement tourner dans un terminal séparé).
@@ -159,7 +157,6 @@ Démarrez le serveur qui héberge les agents LangGraph et les outils RAG :
 
 ```bash
 uv run uvicorn src.main:app --reload
-
 ```
 
 *(Le serveur vérifiera la connexion Supabase et chargera l'index FAISS en RAM).*
@@ -170,7 +167,6 @@ Ouvrez un nouveau terminal, assurez-vous que l'environnement virtuel est activé
 
 ```bash
 uv run streamlit run frontend/app.py
-
 ```
 
 L'interface web s'ouvrira dans votre navigateur. Vous pouvez maintenant dialoguer avec l'entité HorRAGor.
