@@ -92,13 +92,68 @@ def inject_custom_fonts():
     )
 
 
-# Appel immédiat de l'injection CSS
-inject_custom_fonts()
+# --- INJECTION DE L'IMAGE DE FOND VAMPIRE ---
+def set_background_image(image_filename):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # On pointe précisément vers le sous-dossier assets/img/
+    image_path = os.path.join(current_dir, "assets", "img", image_filename)
 
+    if not os.path.exists(image_path):
+        st.warning(f"⚠️ Image de fond introuvable : {image_path}")
+        return
+
+    with open(image_path, "rb") as image_file:
+        encoded_string = base64.b64encode(image_file.read()).decode()
+
+    st.markdown(
+        f"""
+        <style>
+        /* 1. Image de fond sur toute l'application */
+        .stApp {{
+            background-color: #050505 !important;
+            background-image: 
+                linear-gradient(to bottom, rgba(5,5,5,0.9) 0%, rgba(5,5,5,0.15) 35%, rgba(5,5,5,0.95) 100%),
+                url("data:image/jpeg;base64,{encoded_string}");
+            background-position: bottom center;
+            background-repeat: no-repeat;
+            background-size: cover;
+            background-attachment: fixed;
+        }}
+        
+        /* 2. Contraste pour les bulles de discussion */
+        .stChatMessage {{
+            background-color: rgba(10, 10, 10, 0.7) !important;
+            border-radius: 10px;
+            border: 1px solid rgba(139, 0, 0, 0.3);
+            padding: 12px;
+        }}
+
+        /* 3. SIDEBAR TRANSLUCIDE AVEC FLOU (Glassmorphism) */
+        [data-testid="stSidebar"] {{
+            background-color: rgba(5, 5, 5, 0.4) !important; /* Fond noir très transparent */
+            backdrop-filter: blur(15px) !important; /* Effet de flou diffus */
+            -webkit-backdrop-filter: blur(15px) !important; /* Compatibilité Safari */
+            border-right: 1px solid rgba(139, 0, 0, 0.2) !important; /* Légère bordure sang pour la délimitation */
+        }}
+
+        /* Rend le header de la sidebar transparent pour ne pas casser l'effet */
+        [data-testid="stSidebarHeader"] {{
+            background-color: transparent !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# Appel immédiat de l'injection CSS et fond d'écran
+inject_custom_fonts()
+# set_background_image("damonvampface.jpg")
+set_background_image("damonvampface.png")
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.markdown("<h2 class='projet-lestat'>⚜️ LESTAT ⚜️</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 class='projet-lestat'>⚜️ MENU ⚜️</h2>", unsafe_allow_html=True)
     st.write("Projet de Anna :)")
     st.markdown("---")
     st.markdown("**Statut du Système :**")
@@ -120,7 +175,7 @@ with st.sidebar:
 # --- CORPS PRINCIPAL DE L'INTERFACE ---
 st.markdown("<h1 class='titre-horragor'>HORRAGOR</h1>", unsafe_allow_html=True)
 st.markdown(
-    "<p class='horror-subtitle'>L'agent qui sonde les abysses du cinéma, de la littérature sci/fi et du jeu vidéo d'horreur...</p>",
+    "<p class='horror-subtitle'>L'agent qui sonde les abysses du cinéma d'horreur...</p>",
     unsafe_allow_html=True,
 )
 
