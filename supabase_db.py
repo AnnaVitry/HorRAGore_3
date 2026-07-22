@@ -92,7 +92,7 @@ def init_db():
     # --- LA SOLUTION DE FORCE BRUTE (CASCADE) ---
     print("🧨 Nettoyage absolu en cours (Drop CASCADE)...")
     with engine.begin() as conn:
-        # On force Supabase à détruire toutes les tables, y compris les fantômes comme 'movie_info'
+        # On force Supabase à détruire toutes les tables
         conn.execute(
             text(
                 "DROP TABLE IF EXISTS movie_info, book_info, content_store, scores, medias CASCADE;"
@@ -103,6 +103,43 @@ def init_db():
         "🏗️ Reconstruction des tables avec le nouveau schéma (incluant horragor_id)..."
     )
     Base.metadata.create_all(bind=engine)
+
+    # =====================================================================
+    # --- SUPABASE POSTGRE API : SÉCURISATION RLS AUTOMATISÉE ---
+    # =====================================================================
+    print("🛡️ Sécurisation de l'API Supabase (Activation RLS et Politiques)...")
+    with engine.begin() as conn:
+        # 1. Activation du RLS pour verrouiller l'API
+        conn.execute(text("ALTER TABLE public.medias ENABLE ROW LEVEL SECURITY;"))
+        conn.execute(text("ALTER TABLE public.scores ENABLE ROW LEVEL SECURITY;"))
+        conn.execute(text("ALTER TABLE public.book_info ENABLE ROW LEVEL SECURITY;"))
+        conn.execute(
+            text("ALTER TABLE public.content_store ENABLE ROW LEVEL SECURITY;")
+        )
+
+        # 2. Création des politiques "Lecture Seule" pour le monde extérieur (Front-End)
+        conn.execute(
+            text(
+                'CREATE POLICY "Lecture publique medias" ON public.medias FOR SELECT TO public USING (true);'
+            )
+        )
+        conn.execute(
+            text(
+                'CREATE POLICY "Lecture publique scores" ON public.scores FOR SELECT TO public USING (true);'
+            )
+        )
+        conn.execute(
+            text(
+                'CREATE POLICY "Lecture publique book_info" ON public.book_info FOR SELECT TO public USING (true);'
+            )
+        )
+        conn.execute(
+            text(
+                'CREATE POLICY "Lecture publique content_store" ON public.content_store FOR SELECT TO public USING (true);'
+            )
+        )
+
+    print("🔒 La base est désormais sécurisée en lecture seule pour l'API.")
 
 
 def save_to_supabase(reconciled_records: list):
