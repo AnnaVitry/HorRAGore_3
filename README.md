@@ -1,4 +1,4 @@
-# 🩸 HorRAGore (Projet Lestat)
+# 🩸 HorRAGore (Projet de Anna :)
 
 ## Résumé
 HorRAGore est un moteur **RAG (Retrieval-Augmented Generation)** unifié et un pipeline ETL, spécialisé dans l'univers de l'horreur (cinéma, littérature sci-fi). Il repose sur une architecture **Multi-Agent (LangGraph)**, interrogeant à la fois une base de données relationnelle et vectorielle pour générer des récits horrifiques précis et garantis sans hallucinations.
@@ -32,8 +32,10 @@ HorRAGore_3/
 └── frontend/                   # 🖥️ INTERFACE UTILISATEUR (Streamlit)
     ├── app.py                  # L'application web avec barre de progression et chat
     └── assets/
-        └── fonts/
-            └── police_horragor.ttf # Typographie personnalisée pour l'immersion
+        ├── fonts/
+        │    └── Ghost Shadow.ttf # Typographie personnalisée pour l'immersion
+        └── img/
+            └── damonvampface.png    # Photo de Vampire fond de chat
 
 ```
 
@@ -42,7 +44,7 @@ HorRAGore_3/
 ## 🤖 Modèles et Stack Technique
 
 * **Gestionnaire de paquets :** `uv` (Ultra-rapide, remplace pip/poetry)
-* **Modèle LLM local :** `llama3.2:3b` via Ollama (Agent narrateur et décisionnel)
+* **Modèle LLM local :** `llama3.1` via Ollama. Ce modèle (8 milliards de paramètres) est indispensable pour garantir l'extraction stricte des données (Pydantic) et éviter le contournement des outils par l'IA.
 * **Modèle d'Embeddings :** `nomic-embed-text` via Ollama (Vectorisation sémantique)
 * **Base de données (Hybride) :** Supabase (PostgreSQL) avec l'extension `pgvector`
 * **Mémoire éphémère & Routeur :** FAISS (Facebook AI Similarity Search)
@@ -55,44 +57,53 @@ HorRAGore_3/
 ## 🚀 Installation et Prérequis
 
 ### 1. Prérequis système
+
 Pour faire fonctionner HorRAGor v3.0, assure-toi d'avoir installé :
 
 * **Python 3.10+**
 * L'outil **`uv`** installé sur votre machine.
 * **Ollama** installé sur votre système (Moteur système indépendant de Python).
 * **Installation sous Linux (Ubuntu) :**
+
 ```bash
 curl -fsSL [https://ollama.com/install.sh](https://ollama.com/install.sh) | sh
 
 ```
+
 *(Pour Windows ou macOS, téléchargez l'installateur officiel sur [ollama.com](https://ollama.com))*
+
 * **Docker** & Docker Compose
-* **Langfuse** Observability 
+* **Langfuse** Observability
+
 Le système utilise Langfuse pour monitorer les appels LLM et le comportement des agents.
 
 Lancer l'infrastructure :
 
-```Bash
+```bash
 cd path/to/your/langfuse-folder
 docker compose up -d
+
 ```
 
 Configuration des clés :
 Une fois Langfuse lancé (accessible sur `http://localhost:3000`), récupère tes clés API et ajoute-les dans ton fichier `.env` à la racine de HorRAGore_3 :
 
-Extrait de code :
-```python
+```env
 LANGFUSE_PUBLIC_KEY="pk-lf-..."
 LANGFUSE_SECRET_KEY="sk-lf-..."
 LANGFUSE_HOST="http://localhost:3000"
+
 ```
 
 ### 2. Téléchargement des Modèles d'Intelligence Artificielle
 
-Une fois Ollama installé, téléchargez les modèles requis en tapant directement dans votre terminal :
+L'architecture nécessite un modèle robuste pour le raisonnement et un modèle léger pour la vectorisation. Une fois Ollama installé sur votre système, téléchargez les modèles requis en exécutant ces commandes dans votre terminal :
 
 ```bash
-ollama pull llama3.2:3b
+# 1. Le "Cerveau" : Modèle 8B pour la logique de routage et l'extraction
+ollama pull llama3.1
+
+# 2. Le "Traducteur" : Modèle pour les mathématiques sémantiques
 ollama pull nomic-embed-text
 
 ```
@@ -157,6 +168,7 @@ Démarrez le serveur qui héberge les agents LangGraph et les outils RAG :
 
 ```bash
 uv run uvicorn src.main:app --reload
+
 ```
 
 *(Le serveur vérifiera la connexion Supabase et chargera l'index FAISS en RAM).*
@@ -167,6 +179,7 @@ Ouvrez un nouveau terminal, assurez-vous que l'environnement virtuel est activé
 
 ```bash
 uv run streamlit run frontend/app.py
+
 ```
 
 L'interface web s'ouvrira dans votre navigateur. Vous pouvez maintenant dialoguer avec l'entité HorRAGor.

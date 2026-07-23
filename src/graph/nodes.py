@@ -1,109 +1,160 @@
-from langchain_core.messages import AIMessage, SystemMessage
+from typing import Any, Dict
+
+from langchain_core.messages import SystemMessage
 from langchain_ollama import ChatOllama
 from langgraph.prebuilt import ToolNode
+from pydantic import BaseModel, Field
 
 from src.models.state import AgentState
-
-# On importe les outils que tu as isolés
 from src.tools.rag_tool import find_similar_horror_movies, query_movie_metadata
-from src.tools.scrapper_tool import scrape_detailed_synopsis
 
-# from src.tools.misc_tools import calculate_movie_age, horror_survival_simulator
+
+# --- SCHÉMA D'EXTRACTION (STRUCTURED OUTPUT) ---
+class RagHarvest(BaseModel):
+    """Schéma Pydantic pour forcer le LLM à structurer sa récolte de données."""
+
+    local_lore: Dict[str, Any] = Field(
+        description="Faits locaux extraits (budget, date, réalisateur, etc.)"
+    )
+    is_database_sufficient: bool = Field(
+        description="True si les infos suffisent, False si des détails manquent"
+    )
+
 
 # --- 1. INITIALISATION DES MODÈLES LLM ---
-# On utilise une température basse (0.1) pour les agents techniques (ils doivent être précis)
-llm_tech = ChatOllama(model="llama3.2:3b", temperature=0.1)
-# On utilise une température plus haute (0.7) pour le narrateur (il doit être créatif)
-llm_creative = ChatOllama(model="llama3.2:3b", temperature=0.7)
+# llm_tech = ChatOllama(model="llama3.2:3b", temperature=0.1)
+# llm_creative = ChatOllama(model="llama3.2:3b", temperature=0.7)
+# On passe sur un modèle plus puissant (8B) pour garantir la logique de l'extraction.
+llm_tech = ChatOllama(model="llama3.1", temperature=0.1)
+llm_creative = ChatOllama(model="llama3.1", temperature=0.7)
 
 # --- 2. L'AGENT RAG (Fouille Locale) ---
-# On lui attache UNIQUEMENT ses outils de base de données
-rag_tools = [query_movie_metadata, find_similar_horror_movies, scrape_detailed_synopsis]
+rag_tools = [query_movie_metadata, find_similar_horror_movies]
 rag_agent_llm = llm_tech.bind_tools(rag_tools)
 
 
-def rag_node(state: AgentState):
-    """Premier agent de la chaîne : Cherche dans Supabase."""
-    print("🦇 [Agent RAG] Analyse de la demande...")
+def rag_node(state: AgentState) -> Dict[str, Any]:
+    """Premier agent : Cherche dans Supabase et extrait un état structuré."""
     messages = state["messages"]
-
     system_prompt = SystemMessage(
-        content="Tu es un chercheur expert en bases de données d'horreur. "
-        "Ton unique rôle est d'utiliser les outils SQL et Vectoriels pour extraire "
-        "les informations brutes (budget, date, réalisateur, films similaires). "
-        "Ne fais pas de phrases compliquées, fournis juste les faits."
-        """
-        RÈGLE ABSOLUE POUR LES OUTILS : 
-        Lorsque tu appelles 'query_movie_metadata' ou 'find_similar_horror_movies', 
-        tu dois fournir UNIQUEMENT le titre brut du film, SANS JAMAIS ajouter la date de sortie.
-        Exemple CORRECT : 'Alien' ou 'Psycho'
-        Exemple INTERDIT : 'Alien (1979)' ou 'Psycho (1960)'
-        """
+        content=(
+            "Tu es un chercheur expert en bases de données d'horreur. "
+            "Utilise les outils SQL et Vectoriels pour extraire les infos. "
+            "Fournis uniquement le titre brut du film lors des appels d'outils."
+        )
     )
 
-    # L'agent invoque le LLM avec ses outils attachés
     response = rag_agent_llm.invoke([system_prompt] + messages)
 
-    # On renvoie le message, LangGraph l'ajoutera automatiquement au 'state' grâce à operator.add
-    return {"messages": [response]}
+    # Si le LLM décide d'utiliser un outil, on s'arrête là pour ce cycle
+    if response.tool_calls:
+        return {"messages": [response]}
+
+    # Extraction structurée pour isoler le contexte (Context Trimming)
+    extractor = llm_tech.with_structured_output(RagHarvest)
+    harvest_prompt = SystemMessage(
+        content=(
+            "Analyse l'historique et extrais les métadonnées de la base locale. "
+            "Évalue si les données suffisent."
+        )
+    )
+
+    harvest = extractor.invoke([harvest_prompt] + messages)
+
+    # --- LE COUPE-CIRCUIT (GUARDRAIL) ---
+    # On récupère la dernière question de l'utilisateur
+    last_user_message = next(
+        (m.content.lower() for m in reversed(messages) if m.type == "human"), ""
+    )
+
+    # Mots déclencheurs qui forcent l'appel au web, peu importe ce que pense le LLM
+    trigger_words = ["anecdote", "secret", "tournage", "wiki", "détail"]
+
+    # Remplacement autoritaire de la décision
+    if any(word in last_user_message for word in trigger_words):
+        print(
+            "🛡️ [GUARDRAIL] Mot-clé détecté. Annulation de la décision de l'IA. Forçage vers le Scraper."
+        )
+        final_decision = False
+    else:
+        final_decision = harvest.is_database_sufficient
+
+    return {
+        "messages": [response],
+        "local_lore": harvest.local_lore,
+        "is_database_sufficient": final_decision,
+    }
+
+
+# --- SCHÉMA D'EXTRACTION POUR LE TITRE ---
+class MovieTitleExtraction(BaseModel):
+    """Schéma strict pour forcer le LLM à isoler le titre du film."""
+
+    title: str = Field(
+        description="Le titre exact du film d'horreur mentionné, corrigé si mal orthographié."
+    )
 
 
 # --- 3. L'AGENT SCRAPER (Enquêteur Web) ---
-# On lui attache UNIQUEMENT l'outil Wikipédia
-scraper_tools = [scrape_detailed_synopsis]
-scraper_agent_llm = llm_tech.bind_tools(scraper_tools)
-
-
-def scraper_node(state: AgentState):
-    """Deuxième agent (Optionnel) : Cherche sur Wikipédia si besoin."""
-    print("🕸️ [Agent Scraper] Fouille du web en cours...")
+def scraper_node(state: AgentState) -> Dict[str, Any]:
+    """Agent Scraper : Exécution programmatique avec extraction structurée du titre."""
     messages = state["messages"]
 
-    system_prompt = SystemMessage(
-        content="Tu es un enquêteur du web. L'utilisateur ou l'Agent RAG a besoin de plus de détails. "
-        "Utilise l'outil Wikipedia pour trouver des anecdotes ou un résumé détaillé du film."
+    # 1. Extraction robuste via Pydantic
+    extractor = llm_tech.with_structured_output(MovieTitleExtraction)
+    extraction_prompt = SystemMessage(
+        content="Analyse la conversation et isole le titre du film. Corrige l'orthographe si nécessaire."
     )
 
-    response = scraper_agent_llm.invoke([system_prompt] + messages)
-    return {"messages": [response]}
+    try:
+        # On force le LLM à répondre dans le format JSON de Pydantic
+        title_data = extractor.invoke([extraction_prompt] + messages)
+        movie_title = title_data.title
+    except Exception:
+        # Fallback de sécurité au cas où le LLM crashe
+        user_question = [m.content for m in messages if m.type == "human"][-1]
+        movie_title = user_question
+
+    print(f"🎯 [SCRAPER] Titre extrait pour Wikipédia : {movie_title}")
+
+    # 2. Appel Programmatique de l'outil
+    try:
+        from src.tools.scrapper_tool import scrape_detailed_synopsis
+
+        web_result = scrape_detailed_synopsis.invoke({"movie_title": movie_title})
+    except Exception as e:
+        web_result = f"Échec de l'extraction web : {e}"
+
+    # 3. On injecte le résultat réel dans l'état
+    return {"web_anecdotes": [web_result]}
 
 
 # --- 4. L'AGENT NARRATION (L'Écrivain Gothique) ---
-def narration_node(state: AgentState):
-    """Dernier agent : Rédige la réponse finale SANS avoir d'outils (Context Trimming)."""
-    print("🧛‍⚧️ [Agent Narration] Rédaction de la réponse finale...")
+def narration_node(state: AgentState) -> Dict[str, Any]:
+    """Dernier agent : Rédige la réponse finale isolée de la plomberie."""
     messages = state["messages"]
-
-    # TECHNIQUE DEVIA 25 : Context Trimming
-    # Au lieu de donner tout l'historique brut (qui contient des appels de fonctions JSON bizarres),
-    # on extrait proprement uniquement le texte utile pour l'écrivain.
-    informations_recoltees = ""
-    for msg in messages:
-        if isinstance(msg, AIMessage) and msg.content:
-            informations_recoltees += f"- {msg.content}\n"
+    local_data = state.get("local_lore", {})
+    web_data = state.get("web_anecdotes", [])
 
     system_prompt = SystemMessage(
-        content="Tu es HorRAGor, une entité cybernétique cinéphile sarcastique et terrifiante. "
-        "Ta mission est de répondre à l'utilisateur de manière immersive, horrifique et détaillée. "
-        "Tu DOIS utiliser les informations factuelles qui t'ont été transmises ci-dessous pour construire ton récit.\n\n"
-        f"### INFORMATIONS FACTUELLES RÉCOLTÉES PAR LES AUTRES AGENTS :\n{informations_recoltees}"
-        """
-        RÈGLE DE FORMATAGE ABSOLUE :
-        Tu es le narrateur final. Tu dois délivrer ton récit d'un seul bloc immersif. 
-        Il t'est STRICTEMENT INTERDIT de montrer tes étapes de réflexion (ex: "Étape 1", "Recherche en cours..."). 
-        N'utilise jamais de parenthèses pour décrire tes actions ou pensées internes. Reste dans ton personnage d'entité gothique et terrifiante du début à la fin.
-        """
+        content=(
+            "Tu es HorRAGor, une entité cynique, macabre et lapidaire. "
+            "Rédige ta réponse en te basant STRICTEMENT sur ces données :\n"
+            f"LORE LOCAL : {local_data}\n"
+            f"ANECDOTES WEB : {web_data}\n"
+            "\nCONTRAINTES DE STYLE ABSOLUES :\n"
+            "1. SOIS BREF. Ta réponse ne doit PAS dépasser 3 ou 4 phrases grand maximum.\n"
+            "2. Ton ton doit être direct, tranchant et légèrement moqueur.\n"
+            "3. Pas de bla-bla académique, de métaphores interminables ou de grandes leçons de morale.\n"
+            "4. Termine par une observation glaçante sur le film."
+        )
     )
 
-    # On lui passe juste le prompt système (qui contient les infos) et la question originale de l'utilisateur
-    question_utilisateur = messages[0]  # Le premier message est toujours celui du Human
+    user_question = [m for m in messages if m.type == "human"][-1]
+    response = llm_creative.invoke([system_prompt, user_question])
 
-    response = llm_creative.invoke([system_prompt, question_utilisateur])
     return {"messages": [response]}
 
 
-# On rassemble tous les outils dans une liste globale pour le ToolNode de LangGraph
-all_tools = rag_tools + scraper_tools
-
-# Le ToolNode est une fonction native de LangGraph qui exécute l'outil demandé par un agent
-tools_node = ToolNode(all_tools)
+# --- 5. L'OUTIL DE ROUTAGE DES FONCTIONS ---
+tools_node = ToolNode(rag_tools)

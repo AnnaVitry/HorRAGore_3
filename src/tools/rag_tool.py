@@ -106,7 +106,7 @@ def query_movie_metadata(movie_reference: str) -> str:
     Utilise cet outil pour obtenir les métadonnées d'un film.
     Tu peux lui fournir soit l'ID unique, soit directement le TITRE du film (ex: 'Alien').
     """
-    print(f"   [SQL] Interrogation de Supabase pour : {movie_reference}...")
+    print(f"  [SQL] Interrogation de Supabase pour : {movie_reference}...")
     session = SessionLocal()
     try:
         media = (
