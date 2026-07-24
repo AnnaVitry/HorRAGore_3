@@ -24,4 +24,4 @@ PARQUET_FILE_PATH = os.path.join(BASE_DIR, "data", "horragor_final_data.parquet"
 
 # Paramètres d'Intelligence Artificielle
 EMBEDDING_MODEL_NAME = "nomic-embed-text"
-LLM_MODEL_NAME = "llama3.2:3b"
+LLM_MODEL_NAME = "llama3.1"

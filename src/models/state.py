@@ -35,4 +35,4 @@ class AgentState(TypedDict):
     # Anecdotes et faits bruts récupérés sur le Web par le scraper
     web_anecdotes: list
     # La nouvelle variable transportant la décision du juge
-    verdict: EvaluationVerdict
+    verdict: dict | None

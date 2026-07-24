@@ -160,7 +160,7 @@ with st.sidebar:
 
     # Indicateur dynamique visuel dans la sidebar
     try:
-        response = requests.get("http://localhost:8000/", timeout=180)
+        response = requests.get("http://localhost:8000/", timeout=300)
         st.success("💚 API FastAPI En Ligne")
     except requests.exceptions.RequestException:
         st.error("❤️ API FastAPI Hors-ligne")
@@ -234,7 +234,7 @@ if st.session_state.processing and st.session_state.messages:
         # Étape B : Appel réel vers l'API FastAPI de ton binôme
         try:
             payload = {"user_id": "stream_user_1", "question": last_user_message}
-            response = requests.post(BACKEND_URL, json=payload, timeout=180)
+            response = requests.post(BACKEND_URL, json=payload, timeout=300)
 
             progress_bar.progress(100)
             time.sleep(0.2)

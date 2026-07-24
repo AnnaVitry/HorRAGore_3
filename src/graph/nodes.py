@@ -22,11 +22,8 @@ class RagHarvest(BaseModel):
 
 
 # --- 1. INITIALISATION DES MODÈLES LLM ---
-
-# On passe sur un modèle plus puissant (8B) pour garantir la logique de l'extraction.
 llm_tech = ChatOllama(model="llama3.1", temperature=0.1)
 llm_creative = ChatOllama(model="llama3.1", temperature=0.3)
-# Initialisation du Juge (Température 0 pour l'analyse stricte)
 llm_judge = ChatOllama(model="llama3.1", temperature=0.0)
 
 # --- 2. L'AGENT RAG (Fouille Locale) ---
@@ -47,38 +44,47 @@ def rag_node(state: AgentState) -> dict[str, Any]:
 
     response = rag_agent_llm.invoke([system_prompt] + messages)
 
-    # Si le LLM décide d'utiliser un outil, on s'arrête là pour ce cycle
     if response.tool_calls:
         return {"messages": [response]}
 
-    # Extraction structurée pour isoler le contexte (Context Trimming)
     extractor = llm_tech.with_structured_output(RagHarvest)
     harvest_prompt = SystemMessage(
         content=(
-            "Analyse l'historique et extrais les métadonnées de la base locale. "
-            "Évalue si les données suffisent."
+            "Tu es l'Analyste des Archives de l'Horreur (RAG).\n"
+            "Évalue si le contexte extrait de la base locale est SUFFISANT.\n"
+            "La base contient UNIQUEMENT des métadonnées de surface (synopsis, réalisateur, date).\n"
+            "Elle NE CONTIENT PAS d'informations sur les tournages ou les anecdotes.\n"
+            "Si la question concerne le tournage -> `is_database_sufficient = False`."
         )
     )
 
     harvest = extractor.invoke([harvest_prompt] + messages)
+    final_decision = harvest.is_database_sufficient
 
-    # --- LE COUPE-CIRCUIT (GUARDRAIL) ---
-    # On récupère la dernière question de l'utilisateur
+    # Garde-fou intelligent anti-hallucination de succès
+    lore_text = str(harvest.local_lore).strip().lower()
+    if final_decision is True:
+        fail_words = [
+            "désolé",
+            "aucune donnée",
+            "pas d'information",
+            "aucun résultat",
+            "none",
+            "",
+        ]
+        if any(word in lore_text for word in fail_words):
+            final_decision = False
+
+    # Sécurité sémantique explicite
     last_user_message = next(
         (m.content.lower() for m in reversed(messages) if m.type == "human"), ""
     )
-
-    # Mots déclencheurs qui forcent l'appel au web, peu importe ce que pense le LLM
-    trigger_words = ["anecdote", "secret", "tournage", "wiki", "détail"]
-
-    # Remplacement autoritaire de la décision
-    if any(word in last_user_message for word in trigger_words):
-        print(
-            "🛡️ [GUARDRAIL] Mot-clé détecté. Annulation de la décision de l'IA. Forçage vers le Scraper."
-        )
+    if (
+        "tournage" in last_user_message
+        or "anecdote" in last_user_message
+        or "secret" in last_user_message
+    ):
         final_decision = False
-    else:
-        final_decision = harvest.is_database_sufficient
 
     return {
         "messages": [response],
@@ -91,125 +97,111 @@ def rag_node(state: AgentState) -> dict[str, Any]:
 class MovieTitleExtraction(BaseModel):
     """Schéma strict pour forcer le LLM à isoler le titre du film."""
 
-    title: str = Field(
-        description="Le titre exact du film d'horreur mentionné, corrigé si mal orthographié."
-    )
+    title: str = Field(description="Le titre exact du film d'horreur mentionné.")
 
 
 # --- 3. L'AGENT SCRAPER (Enquêteur Web) ---
 def scraper_node(state: AgentState) -> dict[str, Any]:
-    """Agent Scraper : Exécution programmatique avec extraction structurée du titre."""
+    """Agent Scraper isolé : Isole le titre et appelle l'outil Wikipédia."""
     messages = state["messages"]
 
-    # 1. Extraction robuste via Pydantic
     extractor = llm_tech.with_structured_output(MovieTitleExtraction)
     extraction_prompt = SystemMessage(
-        content="Analyse la conversation et isole le titre du film. Corrige l'orthographe si nécessaire."
+        content="Analyse la conversation et isole uniquement le titre du film."
     )
 
     try:
-        # On force le LLM à répondre dans le format JSON de Pydantic
         title_data = extractor.invoke([extraction_prompt] + messages)
         movie_title = title_data.title
-    except Exception:  # noqa: BLE001
-        # Fallback de sécurité au cas où le LLM crashe
+    except Exception:
         user_question = [m.content for m in messages if m.type == "human"][-1]
         movie_title = user_question
 
-    print(f"🎯 [SCRAPER] Titre extrait pour Wikipédia : {movie_title}")
+    print(f"🎯 [SCRAPER NODE] Titre extrait pour Wikipédia : {movie_title}")
 
-    # 2. Appel Programmatique de l'outil
     try:
         from src.tools.scrapper_tool import scrape_detailed_synopsis
 
         web_result = scrape_detailed_synopsis.invoke({"movie_title": movie_title})
-        print(f"\n🕸️ [DEBUG WEB] Résultat brut : {web_result[:400]}...\n")
-    except Exception as e:  # noqa: BLE001
+        print(f"\n🕸️ [DEBUG WEB] Résultat brut : {web_result[:300]}...\n")
+    except Exception as e:
         web_result = f"Échec de l'extraction web : {e}"
 
-    # 3. On injecte le résultat réel dans l'état
     return {"web_anecdotes": [web_result]}
 
 
 # --- 4. L'AGENT NARRATION (L'Écrivain Gothique) ---
-# --- 4. L'AGENT NARRATION (L'Écrivain Gothique) ---
 def narration_node(state: AgentState) -> dict[str, Any]:
-    """Dernier agent : Rédige la réponse finale isolée de la plomberie."""
+    """Dernier agent : Répond à n'importe quelle requête horrifique avec style et concision."""
+    messages = state["messages"]
 
-    # La ligne contenant `messages = state["messages"]` a été supprimée.
+    # 1. On récupère la vraie question posée par l'utilisateur
+    user_question = next(
+        (m.content for m in messages if m.type == "human"), "Question sur l'horreur"
+    )
+
+    # 2. On rassemble toutes les sources disponibles (Supabase + Web)
+    local_lore = state.get("local_lore", {})
     web_data = state.get("web_anecdotes", [])
 
-    # On adoucit légèrement les termes ("cynique" au lieu de "macabre") pour éviter les blocages de sécurité de Llama 3.
     system_prompt = SystemMessage(
         content=(
-            "Tu es HorRAGor, une entité cynique d'une élégance froide. "
-            "TRADUIS et RÉSUME en français les faits de tournage suivants :\n\n"
-            f"DONNÉES BRUTES : {web_data}\n\n"
-            "RÈGLES :\n"
-            "1. Ne parle QUE des lieux de tournage et des décors mentionnés ci-dessus.\n"
-            "2. Rédige 3 phrases maximum, avec un ton sarcastique."
+            "Tu es HorRAGor, une entité cynique d'une élégance froide, Oracle suprême de l'horreur.\n\n"
+            f'QUESTION DE L\'UTILISATEUR : "{user_question}"\n\n'
+            f"DONNÉES LOCALES (Supabase) : {local_lore}\n"
+            f"DONNÉES WEB (Wikipédia) : {web_data}\n\n"
+            "RÈGLES DE RÉDACTION :\n"
+            "1. Réponds précisément à ce qui est demandé (qu'il s'agisse d'un calcul de survie, du nombre de films, d'un casting ou de détails de tournage).\n"
+            "2. Sois percutant et direct : **1 à 2 paragraphes maximum** (interdiction absolue de faire une dissertation de 10 lignes).\n"
+            "3. Conserve ton ton sarcastique, sombre et hautain, fidèle à ton personnage."
         )
     )
 
-    # LE COUP DE MAÎTRE ARCHITECTURAL : On coupe le fil avec l'utilisateur.
-    # On ne lui passe PAS la question brute (qui contient le titre du film et déclenche l'hallucination).
-    # On la remplace par un ordre d'exécution stérile.
     sterile_command = HumanMessage(
-        content="Génère ton récit cynique basé EXCLUSIVEMENT sur les données fournies, sans rien ajouter de ton propre savoir."
+        content="Génère ta réponse cynique en exploitant les données fournies et en restant concis."
     )
 
     response = llm_creative.invoke([system_prompt, sterile_command])
-
-    # On préserve l'historique de la conversation pour le graphe
     return {"messages": [response]}
 
 
+# --- 5. CONTRÔLE QUALITÉ (Le Juge) ---
 def quality_control_node(state: AgentState) -> dict[str, Any]:
-    """
-    Évalue la réponse de l'Écrivain Gothique et audite le respect des consignes.
-
-    Args:
-        state (AgentState): L'état courant du graphe contenant l'historique.
-
-    Returns:
-        Dict[str, Any]: Le verdict Pydantic et l'injonction de correction si refusé.
-    """
+    """Évalue la réponse de l'Écrivain (Uniquement sur le ton et l'ambiance)."""
     messages = state["messages"]
-
-    # On isole le texte fraîchement généré par l'Écrivain
     last_agent_message = messages[-1].content
 
-    # Le Juge est contraint par Pydantic
+    # L'appel au LLM reste sous format Pydantic pour garantir la structure
     evaluator_llm = llm_judge.with_structured_output(EvaluationVerdict)
 
     audit_prompt = SystemMessage(
         content=(
-            "Tu es un Auditeur Qualité intraitable. "
-            "Examine le texte suivant généré par l'Écrivain Gothique.\n\n"
-            "RÈGLES À AUDITER :\n"
-            "1. LONGUEUR : Le texte DOIT faire 3 phrases STRICT MAXIMUM.\n"
-            "2. TON : Le texte DOIT être cynique et sarcastique.\n"
-            "3. FAITS : Aucun ajout d'éléments paranormaux imaginaires (pas de malédiction, etc.).\n\n"
+            "Tu es HorRAGor, l'Auditeur Suprême des Ténèbres.\n\n"
+            "RÈGLE UNIQUE À VÉRIFIER :\n"
+            "Le texte doit-il être rejeté ? Réponds 'NON' **uniquement** si le texte est plat, gentil, trop court, ou totalement horssujet.\n"
+            "Si le texte a de l'ambiance, du cynisme, et parle du film, ton verdict DOIT être 'OUI'. Sois indulgent.\n\n"
             f'TEXTE À AUDITER : "{last_agent_message}"\n\n'
-            "Rédige d'abord ton analyse préliminaire. Ensuite, si UNE SEULE règle est violée, ton verdict final DOIT être 'NON'."
+            "Rédige une brève analyse et donne ton verdict (OUI ou NON)."
         )
     )
-
-    # Exécution de l'audit
-    verdict = evaluator_llm.invoke([audit_prompt])
+    # 1. Le LLM renvoie l'objet Pydantic
+    verdict_obj = evaluator_llm.invoke([audit_prompt])
     print(
-        f"\n⚖️ [JUGE] Analyse : {verdict.analyse_preliminaire}\nVerdict : {verdict.grade} | Critique : {verdict.critique}\n"
+        f"\n⚖️ [JUGE] Analyse : {verdict_obj.analyse_preliminaire}\nVerdict : {verdict_obj.grade} | Critique : {verdict_obj.critique}\n"
     )
 
-    # Si refusé, on crée un message autoritaire pour obliger l'Écrivain à corriger sa copie
-    if verdict.grade == "NON":
+    # 2. CONVERSION EN DICTIONNAIRE pour la sauvegarde LangGraph
+    verdict_dict = verdict_obj.model_dump()
+
+    if verdict_obj.grade == "NON":
         correction_message = HumanMessage(
-            content=f"REFUSÉ par le contrôle qualité. Motif : {verdict.critique}. Corrige ce défaut et génère une nouvelle version."
+            content=f"REFUSÉ. Motif : {verdict_obj.critique}. Mets plus de cynisme et de noirceur."
         )
-        return {"verdict": verdict, "messages": [correction_message]}
+        # On passe le dictionnaire à LangGraph
+        return {"verdict": verdict_dict, "messages": [correction_message]}
 
-    return {"verdict": verdict}
+    # On passe le dictionnaire à LangGraph
+    return {"verdict": verdict_dict}
 
 
-# --- 5. L'OUTIL DE ROUTAGE DES FONCTIONS ---
 tools_node = ToolNode(rag_tools)

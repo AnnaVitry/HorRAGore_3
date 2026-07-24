@@ -60,23 +60,18 @@ def route_after_eval(state: AgentState) -> str:
     verdict = state.get("verdict")
     messages = state.get("messages", [])
 
-    # 1. Le Juge valide : on sort normalement
-    if verdict and verdict.grade == "OUI":
+    # CHANGEMENT ICI : verdict est un dict, on utilise .get("grade")
+    if verdict and verdict.get("grade") == "OUI":
         return END
 
-    # 2. LE COUPE-CIRCUIT : On compte les messages de recadrage dans l'historique
-    refus_count = sum(
-        1 for m in messages if "REFUSÉ par le contrôle qualité" in str(m.content)
-    )
+    refus_count = sum(1 for m in messages if "REFUSÉ" in str(m.content))
 
-    # Si le Juge a déjà refusé 2 fois, on force la sortie pour éviter le Timeout
     if refus_count >= 2:
         print(
             f"⚠️ [ROUTEUR] Limite de tolérance atteinte ({refus_count} refus). Forçage de la sortie."
         )
         return END
 
-    # 3. Le Juge refuse (et on est sous la limite) : on reboucle vers l'Écrivain
     print(
         f"🔄 [ROUTEUR] Recadrage en cours. Renvoi à l'Écrivain (Tentative {refus_count + 1})."
     )

@@ -5,6 +5,7 @@ et les arêtes conditionnelles (les routeurs) définis dans l'architecture.
 Il constitue le point d'entrée central du moteur décisionnel.
 """
 
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
 # 2. Import des ouvriers (Logique métier)
@@ -90,6 +91,15 @@ workflow.add_conditional_edges(
     },
 )
 
-# --- COMPILATION ---
-app_graph = workflow.compile()
-print("✅ [PIPELINE] Système Multi-Agent compilé et prêt.")
+# --- COMPILATION (AVEC ET SANS INTERRUPTION) ---
+# On initialise la sauvegarde en mémoire (Checkpointer)
+memory = MemorySaver()
+# On compile en ajoutant le checkpointer et le point d'interruption
+
+# --- AVEC INTERRUPTION (Ce que tu as actuellement) ---
+# # Le graphe se mettra en pause juste avant d'entrer dans le nœud "tools"
+# app_graph = workflow.compile(checkpointer=memory, interrupt_before=["tools"])
+
+# --- EN MODE AUTONOME (Beaucoup plus fluide) ---
+app_graph = workflow.compile(checkpointer=memory)
+print("✅ [PIPELINE] Système Multi-Agent avec validation humaine compilé et prêt.")
