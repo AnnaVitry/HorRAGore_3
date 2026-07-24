@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from pydantic import BaseModel, Field
 
 
@@ -16,11 +14,11 @@ class ChatResponse(BaseModel):
     answer: str = Field(
         ..., description="La réponse générée par l'agent et validée par le Juge"
     )
-    sources: List[str] = Field(
+    sources: list[str] = Field(
         default_factory=list,
         description="Liste des outils ou sources (ex: Wikipédia, Base SQL) utilisés pour formuler la réponse",
     )
-    needs_ui_feedback: Optional[bool] = Field(
+    needs_ui_feedback: bool | None = Field(
         default=False,
         description="Flag optionnel si l'agent a besoin que le front-end affiche un élément spécifique",
     )

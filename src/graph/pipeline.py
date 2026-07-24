@@ -10,6 +10,7 @@ from langgraph.graph import END, START, StateGraph
 # 2. Import des ouvriers (Logique métier)
 from src.graph.nodes import (
     narration_node,
+    quality_control_node,
     rag_node,
     scraper_node,
     tools_node,
@@ -17,6 +18,7 @@ from src.graph.nodes import (
 
 # 3. Import des aiguilleurs (Logique décisionnelle)
 from src.graph.router import (
+    route_after_eval,
     route_after_rag,
     route_after_scraper,
     route_after_tools,
@@ -35,13 +37,14 @@ workflow.add_node("rag_agent", rag_node)
 workflow.add_node("scraper_agent", scraper_node)
 workflow.add_node("narration_agent", narration_node)
 workflow.add_node("tools", tools_node)
+workflow.add_node("quality_control", quality_control_node)
 
 # --- TRAÇAGE DES AUTOROUTES ET AIGUILLAGES ---
 
 # Le point d'entrée est toujours l'agent RAG
 workflow.add_edge(START, "rag_agent")
 
-# Après le RAG, l'aiguilleur décide de la suite (Outils, Scraper, ou Narration)
+# Après le RAG, l'aiguilleur décide de la suite
 workflow.add_conditional_edges(
     "rag_agent",
     route_after_rag,
@@ -52,7 +55,7 @@ workflow.add_conditional_edges(
     },
 )
 
-# Après le Scraper, l'aiguilleur décide de la suite (Outils ou Narration)
+# Après le Scraper, l'aiguilleur décide de la suite
 workflow.add_conditional_edges(
     "scraper_agent",
     route_after_scraper,
@@ -72,8 +75,20 @@ workflow.add_conditional_edges(
     },
 )
 
-# La Narration a toujours le mot de la fin
-workflow.add_edge("narration_agent", END)
+# --- LA BOUCLE DE CONTRÔLE QUALITÉ ---
+
+# La Narration ne va plus vers la fin, elle se soumet au Juge
+workflow.add_edge("narration_agent", "quality_control")
+
+# Le Juge décide si le texte est validé (END) ou refusé (retour à la Narration)
+workflow.add_conditional_edges(
+    "quality_control",
+    route_after_eval,
+    {
+        "narration_agent": "narration_agent",
+        END: END,
+    },
+)
 
 # --- COMPILATION ---
 app_graph = workflow.compile()

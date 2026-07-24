@@ -1,3 +1,5 @@
+import datetime
+
 from langchain_core.tools import tool
 
 
@@ -9,7 +11,7 @@ def calculate_movie_age(release_year: int) -> str:
     Passe uniquement l'année de sortie à 4 chiffres (ex: 1979) en argument.
     """
     print(f"   [MATH] Calcul temporel pour l'année : {release_year}...")
-    current_year = datetime.datetime.now().year
+    current_year = datetime.datetime.now(datetime.UTC).year
     age = current_year - int(release_year)
     return f"Le film a exactement {age} ans."
 

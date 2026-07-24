@@ -11,6 +11,7 @@ from langchain_ollama import OllamaEmbeddings
 
 # Imports Base de données
 from sqlalchemy import create_engine, or_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 # 1. Imports propres depuis notre configuration centralisée (La source de vérité)
@@ -131,8 +132,8 @@ def query_movie_metadata(movie_reference: str) -> str:
             f"Univers: {media.category}, Budget: {media.budget}$, Note: {note}/10. "
             f"(ID officiel pour info: {media.horragor_id})"
         )
-    except Exception as e:
-        return f"Erreur SQL : {str(e)}"
+    except SQLAlchemyError as e:
+        return f"Erreur SQL : {e!s}"
     finally:
         session.close()
 
@@ -189,7 +190,7 @@ def find_similar_horror_movies(movie_reference: str) -> str:
         return f"Recommandations basées sur '{media.title}' :\n" + "\n".join(
             recommandations
         )
-    except Exception as e:
-        return f"Erreur vectorielle : {str(e)}"
+    except SQLAlchemyError as e:
+        return f"Erreur vectorielle : {e!s}"
     finally:
         session.close()

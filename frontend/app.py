@@ -162,7 +162,7 @@ with st.sidebar:
     try:
         response = requests.get("http://localhost:8000/", timeout=180)
         st.success("💚 API FastAPI En Ligne")
-    except Exception:
+    except requests.exceptions.RequestException:
         st.error("❤️ API FastAPI Hors-ligne")
 
     st.markdown("---")
@@ -248,9 +248,9 @@ if st.session_state.processing and st.session_state.messages:
             progress_bar.progress(100)
             random_quote = random.choice(FASTAPI_ERROR_QUOTES)
             answer = f"{random_quote}\n\n*Veuillez vérifier que votre binôme a bien réveillé le serveur FastAPI.*"
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             progress_bar.progress(100)
-            answer = f"💥 **Distorsion de la réalité** : Une erreur inattendue est survenue : {str(e)}"
+            answer = f"💥 **Distorsion de la réalité** : Une erreur inattendue est survenue : {e!s}"
 
         # Étape C : Nettoyage des éléments de chargement et affichage de la réponse finale
         progress_text.empty()

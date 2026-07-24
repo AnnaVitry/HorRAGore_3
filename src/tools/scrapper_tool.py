@@ -51,8 +51,8 @@ def scrape_detailed_synopsis(movie_title: str) -> str:
         try:
             page = wikipedia.page(e.options[0], auto_suggest=False)
             return page.content[:3000]
-        except Exception:
+        except wikipedia.exceptions.DisambiguationError:
             return f"Échec de résolution d'homonymie pour : {movie_title}."
 
-    except Exception as e:
-        return f"Erreur de l'API Wikipédia : {str(e)}"
+    except wikipedia.exceptions.WikipediaException as e:
+        return f"Erreur de l'API Wikipédia : {e!s}"

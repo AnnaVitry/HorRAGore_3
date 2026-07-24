@@ -29,9 +29,8 @@ async def lifespan(app: FastAPI):
         db.query(Media).first()
         db.close()
         print("✅ Connexion BDD Supabase opérationnelle.")
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Erreur critique DB : {e}")
-
     # 2. Injection du graphe compilé dans l'état de l'application
     # Le chargement de l'index FAISS est géré automatiquement
     # par le singleton dans rag_tool.py lors de l'import.
@@ -82,6 +81,6 @@ async def chat_endpoint(request: ChatRequest):
             sources=["Multi-Agent Flow"],
             needs_ui_feedback=False,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"❌ Erreur lors de l'exécution du graphe : {e}")
         raise HTTPException(status_code=500, detail=str(e))

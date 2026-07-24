@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 
 import pandas as pd  # noqa: F401
 import polars as pl
@@ -15,6 +14,7 @@ from sqlalchemy import (
     create_engine,
     text,  # Permet d'exécuter des requêtes SQL brutes
 )
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 # import du config avec les variables
@@ -169,9 +169,12 @@ def save_to_supabase(reconciled_records: list):
             dt = None
             if rec.get("release_date"):
                 try:
-                    dt = datetime.strptime(rec["release_date"], "%Y-%m-%d").date()
-                except Exception:
-                    pass
+                    from datetime import date
+
+                    dt = date.fromisoformat(rec["release_date"])
+                except ValueError as e:
+                    print(f"⚠️ Format de date invalide ignoré : {e}")
+                    dt = None  # Ou toute autre logique par défaut
 
             new_media = Media(
                 horragor_id=rec["horragor_id"],
@@ -228,7 +231,7 @@ def save_to_supabase(reconciled_records: list):
             f"✅ Opération terminée : {inserted_count} insérés, {skipped_count} ignorés."
         )
 
-    except Exception as e:
+    except SQLAlchemyError as e:
         session.rollback()
         print(f"❌ Erreur lors de la sauvegarde : {e}")
     finally:
