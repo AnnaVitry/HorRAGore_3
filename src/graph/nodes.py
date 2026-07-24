@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
@@ -26,7 +26,7 @@ class RagHarvest(BaseModel):
 # llm_creative = ChatOllama(model="llama3.2:3b", temperature=0.7)
 # On passe sur un modèle plus puissant (8B) pour garantir la logique de l'extraction.
 llm_tech = ChatOllama(model="llama3.1", temperature=0.1)
-llm_creative = ChatOllama(model="llama3.1", temperature=0.7)
+llm_creative = ChatOllama(model="llama3.1", temperature=0.3)
 
 # --- 2. L'AGENT RAG (Fouille Locale) ---
 rag_tools = [query_movie_metadata, find_similar_horror_movies]
@@ -122,6 +122,7 @@ def scraper_node(state: AgentState) -> Dict[str, Any]:
         from src.tools.scrapper_tool import scrape_detailed_synopsis
 
         web_result = scrape_detailed_synopsis.invoke({"movie_title": movie_title})
+        print(f"\n🕸️ [DEBUG WEB] Résultat brut : {web_result[:400]}...\n")
     except Exception as e:
         web_result = f"Échec de l'extraction web : {e}"
 
@@ -130,29 +131,35 @@ def scraper_node(state: AgentState) -> Dict[str, Any]:
 
 
 # --- 4. L'AGENT NARRATION (L'Écrivain Gothique) ---
+# --- 4. L'AGENT NARRATION (L'Écrivain Gothique) ---
 def narration_node(state: AgentState) -> Dict[str, Any]:
     """Dernier agent : Rédige la réponse finale isolée de la plomberie."""
-    messages = state["messages"]
-    local_data = state.get("local_lore", {})
+
+    # La ligne contenant `messages = state["messages"]` a été supprimée.
     web_data = state.get("web_anecdotes", [])
 
+    # On adoucit légèrement les termes ("cynique" au lieu de "macabre") pour éviter les blocages de sécurité de Llama 3.
     system_prompt = SystemMessage(
         content=(
-            "Tu es HorRAGor, une entité cynique, macabre et lapidaire. "
-            "Rédige ta réponse en te basant STRICTEMENT sur ces données :\n"
-            f"LORE LOCAL : {local_data}\n"
-            f"ANECDOTES WEB : {web_data}\n"
-            "\nCONTRAINTES DE STYLE ABSOLUES :\n"
-            "1. SOIS BREF. Ta réponse ne doit PAS dépasser 3 ou 4 phrases grand maximum.\n"
-            "2. Ton ton doit être direct, tranchant et légèrement moqueur.\n"
-            "3. Pas de bla-bla académique, de métaphores interminables ou de grandes leçons de morale.\n"
-            "4. Termine par une observation glaçante sur le film."
+            "Tu es HorRAGor, une entité cynique d'une élégance froide. "
+            "TRADUIS et RÉSUME en français les faits de tournage suivants :\n\n"
+            f"DONNÉES BRUTES : {web_data}\n\n"
+            "RÈGLES :\n"
+            "1. Ne parle QUE des lieux de tournage et des décors mentionnés ci-dessus.\n"
+            "2. Rédige 3 phrases maximum, avec un ton sarcastique."
         )
     )
 
-    user_question = [m for m in messages if m.type == "human"][-1]
-    response = llm_creative.invoke([system_prompt, user_question])
+    # LE COUP DE MAÎTRE ARCHITECTURAL : On coupe le fil avec l'utilisateur.
+    # On ne lui passe PAS la question brute (qui contient le titre du film et déclenche l'hallucination).
+    # On la remplace par un ordre d'exécution stérile.
+    sterile_command = HumanMessage(
+        content="Génère ton récit cynique basé EXCLUSIVEMENT sur les données fournies, sans rien ajouter de ton propre savoir."
+    )
 
+    response = llm_creative.invoke([system_prompt, sterile_command])
+
+    # On préserve l'historique de la conversation pour le graphe
     return {"messages": [response]}
 
 
