@@ -31,7 +31,7 @@ HorRAGore_3/
 │   │   └── pipeline.py         # Assemblage du graphe d'exécution
 │   └── tools/                  
 │       ├── rag_tool.py         # Outils métier (Recherche SQL, PGVector, Index FAISS)
-│       └── scrapper_tool.py    # Outil de secours web (Extraction Wikipédia)
+│       └── scraper_tool.py    # Outil de secours web (Extraction Wikipédia)
 │
 └── frontend/                   # 🖥️ INTERFACE UTILISATEUR (Streamlit)
     ├── app.py                  # L'application web avec barre de progression et chat

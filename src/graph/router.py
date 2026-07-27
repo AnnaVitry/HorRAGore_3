@@ -33,9 +33,30 @@ def route_after_scraper(state: AgentState) -> str:
     return "narration_agent"
 
 
+# Nombre maximal d'appels d'outils tolérés avant de forcer la sortie vers la Narration.
+MAX_TOOL_LOOPS = 4
+
+
 def route_after_tools(state: AgentState) -> str:
-    """Retourne le flux à l'agent ayant invoqué l'outil."""
-    for msg in reversed(state["messages"]):
+    """Retourne le flux à l'agent ayant invoqué l'outil, avec coupe-circuit anti-boucle."""
+    messages = state["messages"]
+
+    # Coupe-circuit : si les agents s'acharnent à rappeler des outils (LLM 8B capricieux),
+    # on coupe la boucle et on file écrire avec ce qu'on a, plutôt que de crasher
+    # au recursion_limit de LangGraph.
+    tool_invocations = sum(
+        1
+        for m in messages
+        if isinstance(m, AIMessage) and getattr(m, "tool_calls", None)
+    )
+    if tool_invocations >= MAX_TOOL_LOOPS:
+        print(
+            f"⚠️ [ROUTEUR] Coupe-circuit outils ({tool_invocations} appels). "
+            "Forçage vers la Narration."
+        )
+        return "narration_agent"
+
+    for msg in reversed(messages):
         if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
             tool_name = msg.tool_calls[0]["name"]
             # Si c'était l'outil Wikipédia, on retourne au Scraper

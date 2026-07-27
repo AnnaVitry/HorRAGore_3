@@ -73,6 +73,8 @@ workflow.add_conditional_edges(
     {
         "rag_agent": "rag_agent",
         "scraper_agent": "scraper_agent",
+        # Sortie de secours du coupe-circuit anti-boucle
+        "narration_agent": "narration_agent",
     },
 )
 

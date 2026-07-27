@@ -1,12 +1,18 @@
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_ollama import ChatOllama
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
 from src.models.state import AgentState, EvaluationVerdict
 from src.tools.rag_tool import find_similar_horror_movies, query_movie_metadata
+from src.tools.scraper_tool import scrape_detailed_synopsis
 
 
 # --- SCHÉMA D'EXTRACTION (STRUCTURED OUTPUT) ---
@@ -16,8 +22,23 @@ class RagHarvest(BaseModel):
     local_lore: dict[str, Any] = Field(
         description="Faits locaux extraits (budget, date, réalisateur, etc.)"
     )
+    # Chain-of-Thought : ce champ est rempli AVANT le booléen, donc le modèle est
+    # contraint de raisonner sur la couverture réelle avant de trancher.
+    couverture_analyse: str = Field(
+        description=(
+            "Raisonnement OBLIGATOIRE. Décris ce que demande précisément l'utilisateur, "
+            "puis confronte chaque aspect de la demande aux métadonnées réellement extraites. "
+            "Rappel : la base ne contient QUE des données de surface (synopsis, réalisateur, "
+            "date, budget, note) et JAMAIS d'anecdotes de tournage, de production ou de "
+            "coulisses. Conclus en listant ce qui est couvert et ce qui manque."
+        )
+    )
     is_database_sufficient: bool = Field(
-        description="True si les infos suffisent, False si des détails manquent"
+        description=(
+            "Verdict final déduit STRICTEMENT de 'couverture_analyse'. Mets False dès qu'un "
+            "seul aspect de la question n'est pas couvert par les métadonnées de surface "
+            "(ex : toute demande sur le tournage, les coulisses, la conception, les anecdotes)."
+        )
     )
 
 
@@ -29,6 +50,26 @@ llm_judge = ChatOllama(model="llama3.1", temperature=0.0)
 # --- 2. L'AGENT RAG (Fouille Locale) ---
 rag_tools = [query_movie_metadata, find_similar_horror_movies]
 rag_agent_llm = llm_tech.bind_tools(rag_tools)
+
+
+def _lore_looks_empty(local_lore: Any) -> bool:
+    """Détecte un 'lore' local vide ou négatif (garde-fou anti-hallucination de succès).
+
+    Fonction PURE -> testable unitairement, dans l'esprit du spec sur router.py.
+    NB : l'ancienne implémentation incluait "" dans la liste de mots, ce qui rendait
+    la détection TOUJOURS vraie ('' est sous-chaîne de tout) et cassait la branche locale.
+    """
+    if not local_lore:
+        return True
+    lore_text = str(local_lore).strip().lower()
+    negatifs = [
+        "désolé",
+        "aucune donnée",
+        "pas d'information",
+        "aucun résultat",
+        "none",
+    ]
+    return any(mot in lore_text for mot in negatifs)
 
 
 def rag_node(state: AgentState) -> dict[str, Any]:
@@ -51,40 +92,35 @@ def rag_node(state: AgentState) -> dict[str, Any]:
     harvest_prompt = SystemMessage(
         content=(
             "Tu es l'Analyste des Archives de l'Horreur (RAG).\n"
-            "Évalue si le contexte extrait de la base locale est SUFFISANT.\n"
-            "La base contient UNIQUEMENT des métadonnées de surface (synopsis, réalisateur, date).\n"
-            "Elle NE CONTIENT PAS d'informations sur les tournages ou les anecdotes.\n"
-            "Si la question concerne le tournage -> `is_database_sufficient = False`."
+            "PROCÈDE EN DEUX TEMPS, dans cet ordre strict :\n"
+            "1. Remplis d'abord 'couverture_analyse' : raisonne explicitement sur ce que\n"
+            "   demande l'utilisateur et sur ce que les métadonnées extraites couvrent RÉELLEMENT.\n"
+            "2. SEULEMENT ENSUITE, déduis 'is_database_sufficient' de ce raisonnement.\n\n"
+            "RÈGLE ABSOLUE : la base contient UNIQUEMENT des métadonnées de surface\n"
+            "(synopsis, réalisateur, date, budget, note). Elle NE CONTIENT JAMAIS d'informations\n"
+            "sur le tournage, la production, la conception ou les anecdotes de coulisses.\n"
+            "Donc toute demande portant sur ces aspects -> is_database_sufficient = False,\n"
+            "quelle que soit la formulation (coulisses, making-of, fun fact, comment c'est fait...)."
         )
     )
 
     harvest = extractor.invoke([harvest_prompt] + messages)
     final_decision = harvest.is_database_sufficient
 
-    # Garde-fou intelligent anti-hallucination de succès
-    lore_text = str(harvest.local_lore).strip().lower()
-    if final_decision is True:
-        fail_words = [
-            "désolé",
-            "aucune donnée",
-            "pas d'information",
-            "aucun résultat",
-            "none",
-            "",
-        ]
-        if any(word in lore_text for word in fail_words):
-            final_decision = False
+    # Trace du raisonnement CoT (précieux dans Langfuse pour auditer la décision)
+    print(f"🧠 [RAG/CoT] Analyse couverture : {harvest.couverture_analyse}")
+    print(f"🧭 [RAG] Base locale suffisante ? -> {final_decision}")
 
-    # Sécurité sémantique explicite
-    last_user_message = next(
-        (m.content.lower() for m in reversed(messages) if m.type == "human"), ""
-    )
-    if (
-        "tournage" in last_user_message
-        or "anecdote" in last_user_message
-        or "secret" in last_user_message
-    ):
+    # Garde-fou anti-hallucination de succès : si le "lore" est en réalité vide ou
+    # négatif, on refuse la sortie locale même si le LLM s'est déclaré satisfait.
+    # (Indépendant du CoT : protège contre une base vide.)
+    if final_decision is True and _lore_looks_empty(harvest.local_lore):
+        print("🛡️ [RAG] Lore local vide/négatif : bascule forcée vers le Scraper.")
         final_decision = False
+
+    # NOTE : l'ancienne liste de mots-clés en dur (tournage/anecdote/secret) sur le
+    # message utilisateur a été retirée. La décision repose désormais sur le raisonnement
+    # CoT ci-dessus, robuste aux reformulations (coulisses, making-of, fun fact...).
 
     return {
         "messages": [response],
@@ -93,41 +129,45 @@ def rag_node(state: AgentState) -> dict[str, Any]:
     }
 
 
-# --- SCHÉMA D'EXTRACTION POUR LE TITRE ---
-class MovieTitleExtraction(BaseModel):
-    """Schéma strict pour forcer le LLM à isoler le titre du film."""
-
-    title: str = Field(description="Le titre exact du film d'horreur mentionné.")
+# --- 3. L'AGENT SCRAPER (Enquêteur Web, désormais agentique) ---
+scraper_tools = [scrape_detailed_synopsis]
+scraper_agent_llm = llm_tech.bind_tools(scraper_tools)
 
 
-# --- 3. L'AGENT SCRAPER (Enquêteur Web) ---
 def scraper_node(state: AgentState) -> dict[str, Any]:
-    """Agent Scraper isolé : Isole le titre et appelle l'outil Wikipédia."""
+    """Agent Scraper agentique : réclame l'outil Wikipédia au moteur, puis récolte le butin.
+
+    Deux passages possibles :
+    - 1er passage : le LLM émet un tool_call `scrape_detailed_synopsis` (routé vers `tools`).
+    - 2e passage : le résultat de l'outil est déjà là -> on le range dans `web_anecdotes`
+      (isolation du contexte) et on renvoie un message SANS tool_call pour filer vers la Narration.
+    """
     messages = state["messages"]
+    last = messages[-1]
 
-    extractor = llm_tech.with_structured_output(MovieTitleExtraction)
-    extraction_prompt = SystemMessage(
-        content="Analyse la conversation et isole uniquement le titre du film."
+    # --- 2e passage : on récolte le résultat de l'outil dans le State ---
+    if (
+        isinstance(last, ToolMessage)
+        and getattr(last, "name", "") == "scrape_detailed_synopsis"
+    ):
+        web_result = last.content
+        print(f"🕸️ [SCRAPER] Butin web récolté ({len(str(web_result))} car.).")
+        transition = AIMessage(
+            content="Enquête web terminée. Dossier transmis à la plume de la Narration."
+        )
+        return {"messages": [transition], "web_anecdotes": [web_result]}
+
+    # --- 1er passage : on laisse le LLM décider d'appeler l'outil ---
+    system_prompt = SystemMessage(
+        content=(
+            "Tu es l'Enquêteur Web de l'horreur. La base locale s'est révélée INSUFFISANTE.\n"
+            "Ta mission : appeler l'outil `scrape_detailed_synopsis` pour extraire de Wikipédia "
+            "les anecdotes de tournage/production manquantes.\n"
+            "Passe UNIQUEMENT le titre brut du film comme argument `movie_title`."
+        )
     )
-
-    try:
-        title_data = extractor.invoke([extraction_prompt] + messages)
-        movie_title = title_data.title
-    except Exception:
-        user_question = [m.content for m in messages if m.type == "human"][-1]
-        movie_title = user_question
-
-    print(f"🎯 [SCRAPER NODE] Titre extrait pour Wikipédia : {movie_title}")
-
-    try:
-        from src.tools.scrapper_tool import scrape_detailed_synopsis
-
-        web_result = scrape_detailed_synopsis.invoke({"movie_title": movie_title})
-        print(f"\n🕸️ [DEBUG WEB] Résultat brut : {web_result[:300]}...\n")
-    except Exception as e:
-        web_result = f"Échec de l'extraction web : {e}"
-
-    return {"web_anecdotes": [web_result]}
+    response = scraper_agent_llm.invoke([system_prompt] + messages)
+    return {"messages": [response]}
 
 
 # --- 4. L'AGENT NARRATION (L'Écrivain Gothique) ---
@@ -144,6 +184,20 @@ def narration_node(state: AgentState) -> dict[str, Any]:
     local_lore = state.get("local_lore", {})
     web_data = state.get("web_anecdotes", [])
 
+    # 3. Si le Juge a rejeté la version précédente, on récupère SA critique
+    #    (uniquement la chaîne de texte, pour préserver l'isolation du contexte :
+    #     l'Écrivain ne voit jamais l'historique technique, seulement le motif du refus).
+    verdict = state.get("verdict")
+    correction = ""
+    if verdict and verdict.get("grade") == "NON":
+        motif = verdict.get("critique", "").strip() or "Texte jugé trop plat."
+        correction = (
+            "\n\n⚠️ RÉÉCRITURE IMPOSÉE PAR L'AUDITEUR DES TÉNÈBRES.\n"
+            f"Ta version précédente a été REJETÉE pour ce motif précis : « {motif} ».\n"
+            "Corrige EXACTEMENT ce défaut : intensifie le cynisme et la noirceur, "
+            "sans inventer de nouveaux faits ni dépasser 2 paragraphes."
+        )
+
     system_prompt = SystemMessage(
         content=(
             "Tu es HorRAGor, une entité cynique d'une élégance froide, Oracle suprême de l'horreur.\n\n"
@@ -154,6 +208,7 @@ def narration_node(state: AgentState) -> dict[str, Any]:
             "1. Réponds précisément à ce qui est demandé (qu'il s'agisse d'un calcul de survie, du nombre de films, d'un casting ou de détails de tournage).\n"
             "2. Sois percutant et direct : **1 à 2 paragraphes maximum** (interdiction absolue de faire une dissertation de 10 lignes).\n"
             "3. Conserve ton ton sarcastique, sombre et hautain, fidèle à ton personnage."
+            f"{correction}"
         )
     )
 
@@ -204,4 +259,6 @@ def quality_control_node(state: AgentState) -> dict[str, Any]:
     return {"verdict": verdict_dict}
 
 
-tools_node = ToolNode(rag_tools)
+# Le ToolNode connaît désormais AUSSI l'outil du Scraper.
+# Le routage de retour (rag_agent vs scraper_agent) est géré par route_after_tools.
+tools_node = ToolNode(rag_tools + scraper_tools)
