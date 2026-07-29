@@ -221,3 +221,204 @@ Je compile, je vérifie qu'il ne reste pas de or_ orphelin, et surtout je valide
 
 Compile, check orphan or_, validate disambiguation heuristic on real data
 Compile, check orphan or_, validate disambiguation heuristic on real data
+
+Claude a terminé la réponse.
+HorRAGor BOT Partie 3.pdf
+pdf
+
+DEVIA 25 - IA Agentic.pdf
+pdf
+
+
+LangGraph HorRAGor_ Graphe et Boucles.pdf pdf router.py 79 lignes py pipeline.py 106 lignes py nodes.py 208 lignes py state.py 39 lignes py chat_models.py 25 lignes py scrapper_tool.py 66 lignes py rag_tool.py 197 lignes py misc_tools.py 28 lignes py README.md 179 lignes m
+
+pasted
+
+https://github.com/AnnaVitry/HorRAGore_3.git
+sur la branch debug/tool-scraper-real-agentic
+
+
+Orchestrated code review strategy for debugging branch
+Orchestrated code review strategy for debugging branch
+Je regarde cette branche pour voir ce que tu as implémenté sur le scraper agentique. Je clone et je bascule dessus.
+
+
+Rectified branch nomenclature discrepancy for accurate repository checkout
+Rectified branch nomenclature discrepancy for accurate repository checkout
+La branche existe bien (avec des underscores : debug/tool_scraper_real_agentic, pas des tirets — je prends celle-là). Je bascule dessus et je regarde ce qui a changé par rapport à main.
+
+
+Bascule sur la branche et compare à main
+Bascule sur la branche et compare à main
+Il y a du vrai travail ici, et ton propre message de commit signale déjà un bug résiduel (« scrapper est skippé et passe la main du juge au narrateur directement »). Je lis les fichiers clés pour comprendre exactement où ça coince.
+
+
+Examined node implementations pour scraper, RAG, et narration
+Examined node implementations pour scraper, RAG, et narration
+Le routeur a bien été retravaillé (coupe-circuit sur les outils désormais, MAX_TOOL_LOOPS = 4). Je lis maintenant nodes.py, le cœur du sujet.
+
+
+Investigated pipeline routing logic pour identifier pourquoi scraper s'exécute pas
+Investigated pipeline routing logic pour identifier pourquoi scraper s'exécute pas
+Beaucoup de choses ont été corrigées ici — bien plus que sur main. Je vérifie le câblage dans pipeline.py et le state.py, puis je regarde main.py, pour comprendre pourquoi le scraper reste skippé.
+
+
+Investigated routing logic and scraper skip bug origins
+Investigated routing logic and scraper skip bug origins
+Le dernier commit ajoute un claude.md (« claude historic pour la prochaine debug ») — c'est visiblement une note de passation laissée pour cette session. Je la lis en priorité, puis je regarde les outils pour comprendre le « scraper skippé ».
+
+
+Diagnosed scraper-skipping bug by tracing decision logic flow
+Diagnosed scraper-skipping bug by tracing decision logic flow
+C'est la passation complète de la session précédente — j'ai tout le fil. Deux derniers fichiers à vérifier pour diagnostiquer le « scraper skippé » proprement : l'outil SQL (est-ce que les Fix 1/3 ont bien atterri sur cette branche ?) et l'outil scraper lui-même.
+
+
+Investigated code discrepancies et divergences entre documentation et implémentation réelle
+Investigated code discrepancies et divergences entre documentation et implémentation réelle
+Ça, c'est une découverte importante. Le claude.md (passation) décrit des Fix 1 + 3 appliqués à rag_tool.py (désambiguïsation par titre le plus court + champs manquants affichés « non renseigné » au lieu de « 0$ »). Or sur cette branche, rag_tool.py a toujours l'ancien code : or_(...) + ilike("%...%"). Je confirme sur la suite du fichier et dans l'historique git.
+
+
+Diagnosed missing code fixes et scraper routing ambiguities
+Diagnosed missing code fixes et scraper routing ambiguities
+Diagnostic confirmé, et c'est un point clé. Je vérifie un dernier fichier (main.py, pour le HITL) puis je te fais la synthèse.
+
+
+Diagnosed missing fixes and routing fragility, needs test query clarification
+Diagnosed missing fixes and routing fragility, needs test query clarification
+J'ai fait le tour de la branche. Voici l'état réel, vérifié fichier par fichier, avant qu'on décide de la suite.
+
+Ce qui a bien atterri sur debug/tool_scraper_real_agentic (et c'est du solide) :
+
+La boucle du Juge corrige enfin pour de vrai — c'était le correctif #2, le plus important. narration_node récupère maintenant verdict["critique"] et le réinjecte dans le system prompt (le bloc correction, lignes 190-199), donc l'Écrivain voit le motif du refus au lieu de régénérer à l'aveugle. Le scraper est devenu authentiquement agentique : nœud à deux passages (1er = émission d'un vrai tool_call, 2e = récolte du ToolMessage dans web_anecdotes), le ToolNode enregistre désormais rag_tools + scraper_tools, et route_after_tools renvoie bien vers scraper_agent quand l'outil appelé était Wikipédia. Il y a aussi un coupe-circuit sur la boucle rag ↔ tools (MAX_TOOL_LOOPS = 4), le HITL mort a été retiré de main.py, et scrapper_tool.py est renommé scraper_tool.py (conforme au spec). Sur la plomberie, cette branche est bien meilleure que main.
+
+Le problème que je dois te signaler tout de suite : les Fix 1 et Fix 3 décrits dans ton claude.md ne sont pas dans le code de cette branche. J'ai vérifié : rag_tool.py est identique à main (git diff main...debug -- rag_tool.py est vide), et aucun commit sur aucune branche n'a jamais introduit _resolve_media, func, ni « non renseigné ». Concrètement :
+
+query_movie_metadata fait toujours or_(... ilike("%ref%")).first() → il récupère encore le mauvais film (Alienation 2026 au lieu d'Alien 1979). Le correctif #1, qui était pourtant la priorité n°1 du diagnostic précédent, a été fait dans le bac à sable de la session d'avant mais jamais commité.
+Le budget est toujours renvoyé en Budget: {media.budget}$ → donc 0$ au lieu de « non renseigné ». Fix 3 absent lui aussi.
+Autrement dit, la session précédente a écrit ces correctifs mais ils ont été perdus au moment de pousser. À moins que tu les aies en local non commité, ils sont à refaire.
+
+Sur le « scraper skippé » de ton commit : maintenant que la plomberie est correcte, le skip n'est plus un bug de câblage — c'est une décision de routage, pilotée uniquement par is_database_sufficient, c'est-à-dire l'auto-notation du CoT par llama. Et c'est exactement la fragilité pointée au point #5 de la session d'avant : on demande à un 8B d'être honnête sur ses propres lacunes. Deux cas possibles selon ta question de test, et c'est là que j'ai besoin de toi pour ne pas deviner à ta place :
+
+si tu as testé une question répondable en local (note, date, synopsis), alors skipper le scraper est le comportement correct, pas un bug ;
+si tu as testé une question coulisses/tournage/anecdote et que le scraper a quand même été sauté, alors le CoT a renvoyé True à tort → là c'est un vrai bug de décision.
+Le harvest_prompt dit pourtant explicitement « tournage/coulisses → is_database_sufficient = False », donc pour une question de coulisses il devrait dévier. S'il ne le fait pas, c'est llama qui ne suit pas sa consigne — et le correctif robuste reste la classification d'intention déterministe en amont, plutôt que le self-grading.
+
+Quelle était la question exacte que tu as tapée quand tu as vu le scraper être sauté ? Ça tranche entre « bug » et « comportement normal ». Et dans la foulée : tu veux que je te réapplique les Fix 1 + 3 perdus (le mauvais film, c'est vraiment le bug le plus grave côté données), que je fiabilise le routage vers le scraper, ou les deux ?
+
+Autrement dit, la session précédente a écrit ces correctifs mais ils ont été perdus au moment de pousser. À moins que tu les aies en local non commité, ils sont à refaire. => Ils n'ont pas été implémentés encore; nous nous étions arrété avant de mettre en place ces debug. Commencons à le faire
+
+
+Orchestrated refactoring strategy pour implémenter deux correctifs manqués
+Orchestrated refactoring strategy pour implémenter deux correctifs manqués
+On y va. Je réimplémente Fix 1 (bon film) + Fix 3 (champs honnêtes) dans rag_tool.py, sur cette branche. D'abord je regarde le schéma exact de tes tables et je récupère le parquet pour tester l'heuristique de désambiguïsation sur tes vrais titres (sans DB ni Ollama, en pur Python).
+
+
+Architected trois correctifs : désambiguïsation, formatage métadonnées, et gestion budget
+Architected trois correctifs : désambiguïsation, formatage métadonnées, et gestion budget
+Schéma clair : Media a budget/revenue en BigInteger default=0 (donc 0 = manquant, comme diagnostiqué), release_date nullable, et la note vit dans Score.value. Avant d'écrire le code, je valide l'heuristique de désambiguïsation (« titre le plus court contenant la référence ») sur tes vrais titres du parquet, pour être sûr qu'« Alien » gagne bien contre « Alienation ».
+
+
+Validé deux stratégies de correction et examiné l'état du budget
+Validé deux stratégies de correction et examiné l'état du budget
+Parfait, l'heuristique est validée sur tes vraies données : l'ancien .first() renvoyait bien « Alienation » (le bug), le match exact trouve directement « Alien » (il existe tel quel), et le fallback « plus court » donne aussi « Alien ». Les deux chemins convergent vers le bon film. Petit contrôle sur la ligne « Alien » et sur les budgets, pour savoir ce que l'outil affichera après le Fix 3.
+
+
+Orchestrated données cinématographiques et planifié implémentation des correctifs
+Orchestrated données cinématographiques et planifié implémentation des correctifs
+Tout est confirmé : le vrai « Alien » (1979, note 8.17, Horreur) existe et sera désormais ciblé ; son budget est null (0 pour tous les 10 033 films) → le Fix 3 affichera « non renseigné » honnêtement. J'implémente. Je relis les ancrages exacts avant d'éditer.
+
+
+Ancrage exact query_movie_metadata
+Ancrage exact query_movie_metadata
+Maintenant les éditions. D'abord l'import (func en plus, or_ conservé pour le match exact) :
+
+
+Ajoute func à l'import sqlalchemy
+Ajoute func à l'import sqlalchemy
+J'ajoute le résolveur _resolve_media juste après la connexion (fonction pure, testable, comme le veut l'esprit du spec) :
+
+
+Ajoute le helper _resolve_media après SessionLocal
+Ajoute le helper _resolve_media après SessionLocal
+Fix 1 + Fix 3 dans query_movie_metadata (résolution correcte + champs 0/null affichés « non renseigné ») :
+
+
+Résolution correcte + présentation honnête dans query_movie_metadata
+Résolution correcte + présentation honnête dans query_movie_metadata
+Même résolution dans find_similar_horror_movies (sinon les recommandations repartent du mauvais film) :
+
+
+Vérifié la syntaxe et harmonisé le code avec les standards du projet
+Vérifié la syntaxe et harmonisé le code avec les standards du projet
+Éditions faites. Je vérifie la syntaxe, l'absence d'import orphelin, et je passe le linter (le repo utilise Ruff d'après l'historique de commits).
+
+
+Vérifiant la cohérence du code et validant la syntaxe SQLAlchemy
+Vérifiant la cohérence du code et validant la syntaxe SQLAlchemy
+Tout est vert : syntaxe OK, or_ et func bien utilisés (pas d'import orphelin), et Ruff passe. Voici le diff complet de rag_tool.py.
+
+
+Validated fixes partiellement, identifié implémentation manquante, priorisé prochaines étapes
+Validated fixes partiellement, identifié implémentation manquante, priorisé prochaines étapes
+C'est en place. Les deux correctifs sont écrits, validés sur tes vrais titres du parquet, et Ruff passe. Concrètement, sur ton test « budget d'Alien » :
+
+Avant, l'outil résolvait vers Alienation (2026) et renvoyait Budget: 0$ — d'où toute la cascade d'hallucinations. Après, _resolve_media tombe d'abord sur le match exact Alien (1979-05-25, note 8.17, Univers Horreur), et le rendu devient honnête : Sortie: 1979-05-25, Budget: non renseigné, Note: 8.17/10. Le mauvais film et le faux « 0$ » disparaissent tous les deux, et find_similar_horror_movies part maintenant du bon film lui aussi.
+
+Une réserve d'honnêteté : j'ai validé l'heuristique contre le parquet (les 10 033 titres qui alimentent la base via supabase_db.py), pas contre ton Postgres en direct — je n'ai ni tes identifiants Supabase ni Ollama ici. Le SQL est du standard Postgres (func.lower, func.length, ilike + order_by), donc ça devrait passer tel quel, mais la preuve finale reste un run réel de ton côté.
+
+Je te sors le patch applicable directement, pour que tu n'aies pas à recopier le diff à la main.
+
+
+Identifié l'absence de correctifs et priorisé l'implémentation anti-hallucination
+Identifié l'absence de correctifs et priorisé l'implémentation anti-hallucination
+Pour l'appliquer chez toi : git apply fix1_fix3_rag_tool.patch depuis la racine du repo (ou remplace directement src/tools/rag_tool.py par le fichier complet), puis commit sur la branche.
+
+Un point pour la suite : dans le plan « trio » de la session d'avant, il restait le volet anti-hallucination de la narration — et lui non plus n'est pas dans le code de cette branche. Le system_prompt de narration_node ne dit nulle part à l'Écrivain de s'en tenir aux données fournies. Avec une base à quasi 100 % de budgets vides et sans réalisateur, llama continuera à combler les trous (« budget de 11 millions », « réalisé par… ») même une fois le bon film récupéré. C'est le correctif qui sert directement l'objectif « sans hallucination » du README.
+
+Tu veux que j'enchaîne sur cette règle anti-hallucination dans narration_node, ou tu préfères d'abord faire tourner un run réel avec ces deux fix-là pour vérifier que la résolution SQL passe bien sur ton Postgres ?
+
+
+Fix1 fix3 rag tool
+PATCH 
+
+Rag tool
+PY 
+Je lis d'abord le README actuel du repo pour voir ce qui existe déjà avant de modifier.
+
+
+Lit le README actuel du repo
+Lit le README actuel du repo
+J'ai tout ce qu'il faut. Je mets à jour : arborescence (nouveaux fichiers), section .env (TMDB_API_KEY), section Démarrage (enrichissement TMDB en étape 0), agents (précisions sur le Juge et le Scraper), et anti-hallucination dans les règles de contribution.
+
+
+Exécuté 2 commandes, lu un fichier
+Exécuté 2 commandes, lu un fichier
+Voici ce qui a changé par rapport à l'original :
+
+Arborescence — ajout de example.env, enrich_parquet.py, patch_tmdb_columns.py, horragor_enriched.parquet, et commentaires précis sur config.py (détection auto du parquet enrichi) et scraper_tool.py (API REST directe).
+
+Agents — descriptions bien plus précises : _resolve_media, vérité-terrain SQL brute, garde-fou déterministe des années, fallback forcé du scraper, règle réalisateur/casting. Ce sont les vraies décisions d'architecture qu'on a prises ensemble, pas juste une description générique.
+
+Stack technique — transformé en tableau, avec TMDB en ligne supplémentaire.
+
+.env — mis à jour avec TMDB_API_KEY + instruction cp example.env .env + avertissement gitignore.
+
+Démarrage — Étape 0 ajoutée (enrichissement TMDB), mention de patch_tmdb_columns.py pour les mises à jour sans reconstruction, étapes renumérotées.
+
+Nouvelle section 🗂️ Gestion du Parquet — explique la différence entre les deux parquets et la sélection automatique.
+
+Contribution — règles plus précises alignées sur ce qu'on a réellement codé (Context Trimming, testabilité unitaire, déclaration des champs absents).
+
+
+Readme
+Document · MD 
+donne moi un commentaire court et concis pour le commit
+
+docs(readme): mise à jour architecture, enrichissement TMDB et anti-hallucination
+
+
+
+
+
+
+Claude est une IA et peut faire des erreurs. Veuillez vérifier les réponses.
