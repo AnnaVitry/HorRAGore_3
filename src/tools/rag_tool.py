@@ -10,7 +10,7 @@ from langchain_core.tools import tool
 from langchain_ollama import OllamaEmbeddings
 
 # Imports Base de données
-from sqlalchemy import create_engine, or_
+from sqlalchemy import create_engine, func, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
@@ -23,6 +23,43 @@ from supabase_db import ContentStore, Media, Score
 # --- INITIALISATION DE LA CONNEXION ---
 engine = create_engine(SUPABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
+
+
+def _resolve_media(session, reference: str):
+    """Résout une référence (ID ou titre approximatif) vers UN film précis.
+
+    Stratégie déterministe, dans cet ordre :
+      1. Match EXACT par horragor_id ou par titre (insensible à la casse).
+      2. À défaut, le PLUS COURT titre contenant la référence.
+         Ainsi 'Alien' l'emporte sur 'Alienation', 'Alien Nation', etc.
+
+    Remplace l'ancien `or_(...).ilike("%ref%").first()` qui, sans tri, attrapait
+    le premier film physique venu (d'où 'Alienation' au lieu du vrai 'Alien').
+    """
+    ref = reference.strip()
+
+    # 1. Match exact : ID unique OU titre complet (casse ignorée).
+    media = (
+        session.query(Media)
+        .filter(
+            or_(
+                Media.horragor_id == ref,
+                func.lower(Media.title) == ref.lower(),
+            )
+        )
+        .first()
+    )
+    if media:
+        return media
+
+    # 2. Fallback : le titre le plus court qui CONTIENT la référence.
+    #    order_by(length) puis horragor_id => résultat stable et déterministe.
+    return (
+        session.query(Media)
+        .filter(Media.title.ilike(f"%{ref}%"))
+        .order_by(func.length(Media.title).asc(), Media.horragor_id.asc())
+        .first()
+    )
 
 
 # --- ROUTEUR FAISS (Classe isolée) ---
@@ -110,26 +147,28 @@ def query_movie_metadata(movie_reference: str) -> str:
     print(f"  [SQL] Interrogation de Supabase pour : {movie_reference}...")
     session = SessionLocal()
     try:
-        media = (
-            session.query(Media)
-            .filter(
-                or_(
-                    Media.horragor_id == movie_reference,
-                    Media.title.ilike(f"%{movie_reference}%"),
-                )
-            )
-            .first()
-        )
+        media = _resolve_media(session, movie_reference)
 
         if not media:
             return f"Aucune métadonnée trouvée en base pour '{movie_reference}'."
 
+        # --- Présentation HONNÊTE des champs absents ---
+        # budget/revenue sont des BigInteger default=0 : un 0 (ou None) signifie
+        # "donnée absente", pas "budget nul". On l'affiche comme tel pour ne pas
+        # que l'Écrivain (ni le CoT) prenne un 0 pour une vraie valeur.
+        budget_str = f"{media.budget}$" if media.budget else "non renseigné"
+        date_str = media.release_date if media.release_date else "non renseignée"
+
         score_record = session.query(Score).filter_by(media_id=media.id).first()
-        note = score_record.value if score_record else "Non renseignée"
+        note_str = (
+            f"{score_record.value}/10"
+            if score_record and score_record.value is not None
+            else "non renseignée"
+        )
 
         return (
-            f"Titre Exact: {media.title}, Sortie: {media.release_date}, "
-            f"Univers: {media.category}, Budget: {media.budget}$, Note: {note}/10. "
+            f"Titre Exact: {media.title}, Sortie: {date_str}, "
+            f"Univers: {media.category}, Budget: {budget_str}, Note: {note_str}. "
             f"(ID officiel pour info: {media.horragor_id})"
         )
     except SQLAlchemyError as e:
@@ -148,16 +187,7 @@ def find_similar_horror_movies(movie_reference: str) -> str:
     print(f"   [PGVECTOR] Recherche de similarité pour : {movie_reference}...")
     session = SessionLocal()
     try:
-        media = (
-            session.query(Media)
-            .filter(
-                or_(
-                    Media.horragor_id == movie_reference,
-                    Media.title.ilike(f"%{movie_reference}%"),
-                )
-            )
-            .first()
-        )
+        media = _resolve_media(session, movie_reference)
 
         if not media:
             return f"Film '{movie_reference}' introuvable pour la recommandation."
