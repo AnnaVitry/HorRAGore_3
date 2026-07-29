@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Enrichissement à la mano du parquet
+data/.enrich_checkpoint.json
+data/horragor_enriched.parquet
