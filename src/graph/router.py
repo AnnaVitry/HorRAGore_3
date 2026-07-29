@@ -41,17 +41,21 @@ def route_after_tools(state: AgentState) -> str:
     """Retourne le flux à l'agent ayant invoqué l'outil, avec coupe-circuit anti-boucle."""
     messages = state["messages"]
 
-    # Coupe-circuit : si les agents s'acharnent à rappeler des outils (LLM 8B capricieux),
+    # Coupe-circuit : si le scraper s'acharne à rappeler Wikipédia (LLM 8B capricieux),
     # on coupe la boucle et on file écrire avec ce qu'on a, plutôt que de crasher
     # au recursion_limit de LangGraph.
-    tool_invocations = sum(
+    # IMPORTANT : on ne compte QUE les appels scraper (scrape_detailed_synopsis),
+    # pas les outils RAG (SQL, vectoriel) qui ont leur propre boucle légitime.
+    scraper_invocations = sum(
         1
         for m in messages
-        if isinstance(m, AIMessage) and getattr(m, "tool_calls", None)
+        if isinstance(m, AIMessage)
+        and getattr(m, "tool_calls", None)
+        and any(tc.get("name") == "scrape_detailed_synopsis" for tc in m.tool_calls)
     )
-    if tool_invocations >= MAX_TOOL_LOOPS:
+    if scraper_invocations >= MAX_TOOL_LOOPS:
         print(
-            f"⚠️ [ROUTEUR] Coupe-circuit outils ({tool_invocations} appels). "
+            f"⚠️ [ROUTEUR] Coupe-circuit scraper ({scraper_invocations} appels Wikipédia). "
             "Forçage vers la Narration."
         )
         return "narration_agent"

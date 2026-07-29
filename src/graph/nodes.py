@@ -170,6 +170,9 @@ def scraper_node(state: AgentState) -> dict[str, Any]:
     ):
         web_result = last.content
         print(f"🕸️ [SCRAPER] Butin web récolté ({len(str(web_result))} car.).")
+        print(
+            f"📄 [SCRAPER] Contenu brut (500 premiers car.) :\n{str(web_result)[:500]}\n"
+        )
         transition = AIMessage(
             content="Enquête web terminée. Dossier transmis à la plume de la Narration."
         )
@@ -223,6 +226,20 @@ def narration_node(state: AgentState) -> dict[str, Any]:
     local_lore = state.get("local_lore", {})
     web_data = state.get("web_anecdotes", [])
 
+    # Formatage explicite en texte lisible pour le LLM.
+    # Sans ça, le f-string affiche ['...'] avec crochets/guillemets Python
+    # et le 8B rate le contenu (d'où « archives muettes » malgré Ridley Scott présent).
+    local_text = (
+        local_lore.get("faits_sql_bruts", "Aucune donnée locale.")
+        if isinstance(local_lore, dict)
+        else str(local_lore)
+    )
+    web_text = (
+        "\n\n---\n\n".join(str(w) for w in web_data)
+        if web_data
+        else "Aucune donnée web disponible."
+    )
+
     # 3. Si le Juge a rejeté la version précédente, on récupère SA critique
     #    (uniquement la chaîne de texte, pour préserver l'isolation du contexte :
     #     l'Écrivain ne voit jamais l'historique technique, seulement le motif du refus).
@@ -243,8 +260,8 @@ def narration_node(state: AgentState) -> dict[str, Any]:
         content=(
             "Tu es HorRAGor, une entité cynique d'une élégance froide, Oracle suprême de l'horreur.\n\n"
             f'QUESTION DE L\'UTILISATEUR : "{user_question}"\n\n'
-            f"DONNÉES LOCALES (Supabase) : {local_lore}\n"
-            f"DONNÉES WEB (Wikipédia) : {web_data}\n\n"
+            f"DONNÉES LOCALES (Supabase) :\n{local_text}\n\n"
+            f"DONNÉES WEB (Wikipédia) :\n{web_text}\n\n"
             "RÈGLES DE RÉDACTION :\n"
             "1. FIDÉLITÉ ABSOLUE AUX DONNÉES (règle suprême). Tu ne disposes QUE des "
             "DONNÉES LOCALES et DONNÉES WEB ci-dessus. Il t'est formellement INTERDIT "
@@ -314,6 +331,18 @@ def quality_control_node(state: AgentState) -> dict[str, Any]:
     local_lore = state.get("local_lore", {})
     web_data = state.get("web_anecdotes", [])
 
+    # Même formatage texte propre que dans narration_node (évite ['...'] brut)
+    local_text = (
+        local_lore.get("faits_sql_bruts", "Aucune donnée locale.")
+        if isinstance(local_lore, dict)
+        else str(local_lore)
+    )
+    web_text = (
+        "\n\n---\n\n".join(str(w) for w in web_data)
+        if web_data
+        else "Aucune donnée web disponible."
+    )
+
     evaluator_llm = llm_judge.with_structured_output(EvaluationVerdict)
 
     audit_prompt = SystemMessage(
@@ -329,8 +358,8 @@ def quality_control_node(state: AgentState) -> dict[str, Any]:
             "WEB ci-dessous ; s'il n'y est pas (a fortiori si les sources web sont vides), "
             "c'est une hallucination pure -> verdict 'NON'.\n"
             "3. TON. Le texte doit rester cynique, sombre et hautain (ni plat, ni gentil).\n\n"
-            f"SOURCES LOCALES (vérité SQL) : {local_lore}\n"
-            f"SOURCES WEB (vérité scraper) : {web_data}\n\n"
+            f"SOURCES LOCALES (vérité SQL) :\n{local_text}\n\n"
+            f"SOURCES WEB (vérité scraper) :\n{web_text}\n\n"
             f'TEXTE À AUDITER : "{last_agent_message}"\n\n'
             "Rends 'NON' si le moindre fait est inventé/altéré OU si le ton est plat. "
             "Rends 'OUI' seulement si TOUT fait est sourcé ET le ton est bon. "
