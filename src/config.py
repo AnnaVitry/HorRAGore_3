@@ -22,6 +22,8 @@ if not SUPABASE_URL:
 # On utilise aussi BASE_DIR pour le parquet, comme ça il le trouvera à 100%
 PARQUET_FILE_PATH = os.path.join(BASE_DIR, "data", "horragor_final_data.parquet")
 
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+
 # Paramètres d'Intelligence Artificielle
 EMBEDDING_MODEL_NAME = "nomic-embed-text"
 LLM_MODEL_NAME = "llama3.1"
