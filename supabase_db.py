@@ -1,6 +1,6 @@
 import os
+from datetime import date
 
-import pandas as pd  # noqa: F401
 import polars as pl
 from sqlalchemy import (
     BigInteger,
@@ -12,13 +12,12 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
-    text,  # Permet d'exécuter des requêtes SQL brutes
+    text,
 )
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-# import du config avec les variables
-from src.config import PARQUET_FILE_PATH, SUPABASE_URL
+from src.config import PARQUET_FILE_PATH, SUPABASE_URL, TMDB_API_KEY
 
 Base = declarative_base()
 
@@ -30,14 +29,25 @@ Base = declarative_base()
 class Media(Base):
     __tablename__ = "medias"
     id = Column(Integer, primary_key=True)
-    # --- AJOUT CRITIQUE : Notre identifiant unique universel ---
     horragor_id = Column(String(100), unique=True, nullable=False, index=True)
-
     title = Column(String(255), nullable=False)
     release_date = Column(Date)
-    category = Column(String(50))  # Utile pour stocker "Sci-Fi" ou "Horreur" !
+    category = Column(String(50))
+
+    # --- Financier (parquet original) ---
     budget = Column(BigInteger, default=0)
     revenue = Column(BigInteger, default=0)
+
+    # --- Enrichissement TMDB ---
+    director = Column(String(500))  # ex: "Ridley Scott"
+    cast_top5 = Column(String(1000))  # ex: "Tom Skerritt, Sigourney Weaver, ..."
+    genres = Column(String(255))  # ex: "Horror, Science Fiction"
+    runtime = Column(Integer)  # durée en minutes
+    tagline = Column(Text)  # ex: "In space no one can hear you scream"
+    original_language = Column(String(10))  # ex: "en"
+    budget_tmdb = Column(BigInteger)  # budget réel TMDB (None = non renseigné)
+    revenue_tmdb = Column(BigInteger)  # recettes TMDB
+    tmdb_vote_count = Column(Integer)  # nb votes TMDB
 
     metadata_book = relationship(
         "BookInfo", back_populates="media", uselist=False, cascade="all, delete-orphan"
@@ -79,20 +89,19 @@ class Score(Base):
 
 
 # =====================================================================
-# --- LOGIQUE D'ALIMENTATION ET EXPORT ---
+# --- MOTEUR ---
 # =====================================================================
-
 engine = create_engine(SUPABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
 
+# =====================================================================
+# --- INITIALISATION DU SCHÉMA ---
+# =====================================================================
 def init_db():
     print("🗄️ Initialisation du MPD (Modèle Physique de Données)...")
-
-    # --- LA SOLUTION DE FORCE BRUTE (CASCADE) ---
     print("🧨 Nettoyage absolu en cours (Drop CASCADE)...")
     with engine.begin() as conn:
-        # On force Supabase à détruire toutes les tables
         conn.execute(
             text(
                 "DROP TABLE IF EXISTS movie_info, book_info, content_store, scores, medias CASCADE;"
@@ -100,92 +109,110 @@ def init_db():
         )
 
     print(
-        "🏗️ Reconstruction des tables avec le nouveau schéma (incluant horragor_id)..."
+        "🏗️ Reconstruction des tables avec le nouveau schéma (colonnes TMDB incluses)..."
     )
     Base.metadata.create_all(bind=engine)
 
-    # =====================================================================
-    # --- SUPABASE POSTGRE API : SÉCURISATION RLS AUTOMATISÉE ---
-    # =====================================================================
     print("🛡️ Sécurisation de l'API Supabase (Activation RLS et Politiques)...")
+    tables = ["medias", "scores", "book_info", "content_store"]
     with engine.begin() as conn:
-        # 1. Activation du RLS pour verrouiller l'API
-        conn.execute(text("ALTER TABLE public.medias ENABLE ROW LEVEL SECURITY;"))
-        conn.execute(text("ALTER TABLE public.scores ENABLE ROW LEVEL SECURITY;"))
-        conn.execute(text("ALTER TABLE public.book_info ENABLE ROW LEVEL SECURITY;"))
-        conn.execute(
-            text("ALTER TABLE public.content_store ENABLE ROW LEVEL SECURITY;")
-        )
-
-        # 2. Création des politiques "Lecture Seule" pour le monde extérieur (Front-End)
-        conn.execute(
-            text(
-                'CREATE POLICY "Lecture publique medias" ON public.medias FOR SELECT TO public USING (true);'
+        for t in tables:
+            conn.execute(text(f"ALTER TABLE public.{t} ENABLE ROW LEVEL SECURITY;"))
+            conn.execute(
+                text(
+                    f'CREATE POLICY "Lecture publique {t}" ON public.{t} FOR SELECT TO public USING (true);'
+                )
             )
-        )
-        conn.execute(
-            text(
-                'CREATE POLICY "Lecture publique scores" ON public.scores FOR SELECT TO public USING (true);'
-            )
-        )
-        conn.execute(
-            text(
-                'CREATE POLICY "Lecture publique book_info" ON public.book_info FOR SELECT TO public USING (true);'
-            )
-        )
-        conn.execute(
-            text(
-                'CREATE POLICY "Lecture publique content_store" ON public.content_store FOR SELECT TO public USING (true);'
-            )
-        )
-
     print("🔒 La base est désormais sécurisée en lecture seule pour l'API.")
 
 
-def save_to_supabase(reconciled_records: list):
+# =====================================================================
+# --- INGESTION ---
+# =====================================================================
+def _safe_int(val) -> int | None:
+    """Convertit une valeur en int, renvoie None si vide/nul/0."""
+    try:
+        v = int(val)
+        return v if v != 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_str(val) -> str | None:
+    """Renvoie None si la valeur est vide, NaN ou nulle."""
+    if val is None:
+        return None
+    s = str(val).strip()
+    return s if s and s.lower() not in ("nan", "none", "") else None
+
+
+def save_to_supabase(records: list[dict]) -> None:
     session = SessionLocal()
-    print(
-        f"💾 Insertion massive OPTIMISÉE (Batch) de {len(reconciled_records)} entités..."
-    )
+    print(f"💾 Insertion massive OPTIMISÉE (Batch) de {len(records)} entités...")
+
+    enriched_cols = {
+        "director",
+        "cast_top5",
+        "genres",
+        "runtime",
+        "tagline",
+        "original_language",
+        "budget_tmdb",
+        "revenue_tmdb",
+        "tmdb_vote_count",
+    }
+    has_enrichment = any(k in records[0] for k in enriched_cols) if records else False
+
+    if has_enrichment:
+        print("   ✨ Colonnes TMDB détectées dans le parquet — enrichissement activé.")
+    else:
+        print(
+            "   ℹ️  Pas de colonnes TMDB dans le parquet (parquet original). Ingestion standard."
+        )
 
     try:
-        # 1. L'ASTUCE DE GÉNIE : On télécharge tous les IDs existants en UNE SEULE requête !
         print("⏳ Vérification de l'idempotence (1 seule requête réseau)...")
         existing_ids = {row[0] for row in session.query(Media.horragor_id).all()}
 
-        inserted_count = 0
-        skipped_count = 0
+        inserted = 0
+        skipped = 0
 
-        for rec in reconciled_records:
+        for rec in records:
             if not rec.get("horragor_id"):
                 continue
-
-            # La vérification se fait maintenant instantanément dans la RAM de votre PC
             if rec["horragor_id"] in existing_ids:
-                skipped_count += 1
+                skipped += 1
                 continue
 
-            # --- Création de l'objet (Uniquement pour les NOUVEAUX films) ---
+            # --- Date ---
             dt = None
             if rec.get("release_date"):
                 try:
-                    from datetime import date
-
-                    dt = date.fromisoformat(rec["release_date"])
-                except ValueError as e:
-                    print(f"⚠️ Format de date invalide ignoré : {e}")
-                    dt = None  # Ou toute autre logique par défaut
+                    dt = date.fromisoformat(str(rec["release_date"]))
+                except ValueError:
+                    dt = None
 
             new_media = Media(
                 horragor_id=rec["horragor_id"],
                 title=rec["title"],
                 release_date=dt,
                 category=rec.get("source_universe", "Inconnu"),
-                budget=rec.get("budget", 0) if rec.get("budget") else 0,
-                revenue=rec.get("revenue", 0) if rec.get("revenue") else 0,
+                # Financier original (parquet de base)
+                budget=_safe_int(rec.get("budget")) or 0,
+                revenue=_safe_int(rec.get("revenue")) or 0,
+                # Enrichissement TMDB (None si absent du parquet)
+                director=_safe_str(rec.get("director")),
+                cast_top5=_safe_str(rec.get("cast_top5")),
+                genres=_safe_str(rec.get("genres")),
+                runtime=_safe_int(rec.get("runtime")),
+                tagline=_safe_str(rec.get("tagline")),
+                original_language=_safe_str(rec.get("original_language")),
+                budget_tmdb=_safe_int(rec.get("budget_tmdb")),
+                revenue_tmdb=_safe_int(rec.get("revenue_tmdb")),
+                tmdb_vote_count=_safe_int(rec.get("tmdb_vote_count")),
             )
             session.add(new_media)
-            session.flush()  # On récupère l'ID relationnel
+            session.flush()
 
             if rec.get("is_book"):
                 session.add(
@@ -217,19 +244,13 @@ def save_to_supabase(reconciled_records: list):
                     )
                 )
 
-            inserted_count += 1
-
-            # 2. L'AUTRE ASTUCE : On valide par lots de 1000 pour soulager la RAM du serveur Supabase
-            if inserted_count % 1000 == 0:
+            inserted += 1
+            if inserted % 1000 == 0:
                 session.commit()
-                print(
-                    f"   🚀 [Batch] {inserted_count} films expédiés et validés en base..."
-                )
+                print(f"   🚀 [Batch] {inserted} films expédiés et validés en base...")
 
-        session.commit()  # On valide le reste
-        print(
-            f"✅ Opération terminée : {inserted_count} insérés, {skipped_count} ignorés."
-        )
+        session.commit()
+        print(f"✅ Opération terminée : {inserted} insérés, {skipped} ignorés.")
 
     except SQLAlchemyError as e:
         session.rollback()
@@ -239,19 +260,24 @@ def save_to_supabase(reconciled_records: list):
 
 
 # =====================================================================
-# --- BLOC D'EXÉCUTION PRINCIPAL (LE COUP D'ÉCLAIR ⚡) ---
+# --- BLOC PRINCIPAL ---
 # =====================================================================
 if __name__ == "__main__":
     print("🦇 Réveil de l'architecture Supabase...")
 
+    if TMDB_API_KEY:
+        print(f"🎬 Clé TMDB détectée dans .env (****{TMDB_API_KEY[-4:]}).")
+        print("   → Lance 'python enrich_parquet.py --api-key $TMDB_API_KEY' avant")
+        print("     d'exécuter ce script pour bénéficier des colonnes enrichies.")
+    else:
+        print("ℹ️  Pas de TMDB_API_KEY dans .env — ingestion du parquet standard.")
+
     init_db()
 
-    fichier_donnees = PARQUET_FILE_PATH
-
-    if os.path.exists(fichier_donnees):
-        print(f"📖 Lecture du grimoire de données : {fichier_donnees}")
-        df_final = pl.read_parquet(fichier_donnees)
-        lignes_a_inserer = df_final.to_dicts()
-        save_to_supabase(lignes_a_inserer)
+    if os.path.exists(PARQUET_FILE_PATH):
+        label = "enrichi" if "enriched" in PARQUET_FILE_PATH else "original"
+        print(f"📖 Lecture du grimoire de données ({label}) : {PARQUET_FILE_PATH}")
+        df = pl.read_parquet(PARQUET_FILE_PATH)
+        save_to_supabase(df.to_dicts())
     else:
-        print(f"⚠️ Le fichier '{fichier_donnees}' est introuvable.")
+        print(f"⚠️ Le fichier '{PARQUET_FILE_PATH}' est introuvable.")
