@@ -1,483 +1,127 @@
-LangGraph HorRAGor_ Graphe et Boucles.pdf
-pdf
+# HorRAGore — Contexte de reprise pour Claude
 
+## C'est quoi ce projet
 
-router.py
-79 lignes
+Bot conversationnel spécialisé dans le cinéma d'horreur. Architecture **Multi-Agent peer-to-peer** sous LangGraph (pas de manager central) : RAG local → Scraper web conditionnel → Narration → Juge. Objectif affiché dans le README : **zéro hallucination**.
 
-py
+Projet de formation (DEV IA, Antony Schutz). Le cahier des charges demandait 3 agents + Langfuse. On a livré les 3 agents conformes + des couches défensives supplémentaires (garde-fous déterministes, fact-check Juge, résolution film).
 
+---
 
-pipeline.py
-106 lignes
+## Stack exact
 
-py
+- **Python** : géré via `uv` (pas pip, pas poetry)
+- **LLM local raisonnement/narration** : `llama3.1` (8B) via Ollama
+- **LLM local embeddings** : `nomic-embed-text` via Ollama
+- **Base de données** : Supabase (PostgreSQL + pgvector)
+- **Cache vectoriel** : FAISS (`faiss_index.bin` en RAM au démarrage)
+- **Orchestration** : LangGraph + LangChain
+- **Observabilité** : Langfuse (Docker local, port 3000)
+- **Backend** : FastAPI + Uvicorn
+- **Frontend** : Streamlit (`frontend/app.py`)
+- **Données** : `data/horragor_enriched.parquet` (10 033 films, 25 colonnes)
 
+---
 
-nodes.py
-208 lignes
+## Données
 
-py
+**Source unique** : `data/horragor_enriched.parquet` (ne pas supprimer, ne pas remplacer par l'original).
 
+Enrichi via API TMDB — colonnes ajoutées : `director`, `cast_top5`, `genres`, `runtime`, `tagline`, `original_language`, `budget_tmdb`, `revenue_tmdb`, `tmdb_vote_count`.
 
-state.py
-39 lignes
+Taux de remplissage des colonnes clés :
+- `director` : 93.9% (9421/10033)
+- `cast_top5` : 93.9%
+- `genres` : 95.3%
+- `runtime` : 91.2%
+- `budget_tmdb` : 20.6% (beaucoup de films indépendants non renseignés)
 
-py
+**Ce qui n'existe PAS dans les données** : la colonne `budget` originale est à 0 sur 100% des lignes — seul `budget_tmdb` est fiable.
 
+---
 
-chat_models.py
-25 lignes
+## Décisions d'architecture importantes
 
-py
+### `_resolve_media` (rag_tool.py)
+Résolution déterministe du film : match exact du titre (insensible à la casse) en priorité, puis plus court titre contenant la référence. Remplace l'ancien `ilike('%ref%').first()` qui renvoyait le premier film physique (ex: « Alienation » au lieu du vrai « Alien »). **Ne pas revenir à l'ancien comportement.**
 
+### Vérité-terrain SQL brute (nodes.py → rag_node)
+`local_lore` contient la **sortie SQL brute** des outils, pas une ré-extraction LLM. L'ancien extracteur `RagHarvest` déformait les dates (1979 → 2024). Le LLM ne sert qu'à décider du routage (`is_database_sufficient`), jamais à re-formater les faits.
 
-scrapper_tool.py
-66 lignes
+### Coupe-circuit scraper-only (router.py)
+`route_after_tools` ne compte que les appels `scrape_detailed_synopsis`, pas les outils RAG. L'ancien compteur global déclenchait le coupe-circuit dès 4 appels (RAG en faisait 3 + scraper 1 = coupure avant que le résultat arrive).
 
-py
+### Scraper sans lib `wikipedia` (scraper_tool.py)
+La lib `wikipedia` était trop fragile (User-Agent générique rate-limité, JSONDecodeError opaques). Remplacée par des appels directs à l'API REST Wikipédia (`opensearch` + `/api/rest_v1/page/summary/` + `action=parse`) avec User-Agent explicite et retry backoff. **Ne pas réintroduire la lib `wikipedia`.**
 
+### Intro Wikipédia toujours incluse
+`_extract_content` inclut systématiquement le résumé introductif de la page (qui contient réalisateur + acteurs dès la première phrase) avant les sections Production. L'ancienne version ne l'incluait qu'en fallback → Ridley Scott manquait dans le butin.
 
-rag_tool.py
-197 lignes
+### Fallback déterministe du scraper (nodes.py → scraper_node)
+Si le LLM 8B n'émet pas le `tool_call`, le scraper est forcé via `_extract_title_from_facts` sur le SQL brut. Évite le no-op silencieux.
 
-py
+### web_data et local_lore formatés en texte (nodes.py)
+`web_data` est une liste Python. Un f-string `{web_data}` affiche `['...']` avec crochets — le 8B ne lit pas dedans. On joint proprement : `"\n\n---\n\n".join(str(w) for w in web_data)`. **Toujours formatter en texte avant injection dans un prompt.**
 
+### Réalisateur/casting = données web uniquement (pour l'instant)
+Les prompts Narration et Juge interdisent de citer un réalisateur absent des données web. Cette règle devra être mise à jour quand `rag_tool.py` exposera `director` depuis Supabase (voir Prochaine étape).
 
-misc_tools.py
-28 lignes
+### Garde-fou déterministe des années (nodes.py → quality_control_node)
+`_detect_fabricated_years` extrait toutes les années (regex `1[89]\d{2}|20\d{2}`) de la narration et les compare aux sources. Une année absente des sources → rejet forcé, indépendamment du verdict LLM.
 
-py
+---
 
+## Ce que Claude NE doit PAS faire
 
-README.md
-179 lignes
+- **Ne pas reconstruire la base** (`supabase_db.py`) sans raison explicite — ça prend du temps et efface les données.
+- **Ne pas réintroduire `patch_tmdb_columns.py` ou `enrich_parquet.py`** — retirés du repo, le parquet enrichi est la source définitive.
+- **Ne pas réintroduire la lib `wikipedia`**.
+- **Ne pas changer `local_lore`** pour y mettre autre chose que le SQL brut.
+- **Ne pas supprimer `horragor_enriched.parquet`** — l'original a été supprimé.
+- **Ne pas ajouter `TMDB_API_KEY` au runtime** — plus utilisée dans le code.
 
-md
+---
 
-lit le chat langraph boucle et les autres fichier de mon projet Horragore. Est ce une bonne approche?
+## Fichiers clés
 
+| Fichier | Responsabilité réelle |
+|---|---|
+| `src/config.py` | Chemin absolu vers le parquet enrichi, URL Supabase, noms des modèles |
+| `src/tools/rag_tool.py` | `_resolve_media`, `query_movie_metadata` (SQL), `find_similar_horror_movies` (pgvector) |
+| `src/tools/scraper_tool.py` | API REST Wikipédia, `_pick_best_result`, `_extract_content` avec intro en tête |
+| `src/graph/nodes.py` | 4 agents + helpers `_detect_fabricated_years`, `_extract_title_from_facts` |
+| `src/graph/router.py` | Coupe-circuit scraper-only, aiguillage conditionnel |
+| `src/graph/pipeline.py` | Câblage LangGraph, compilation du graphe |
+| `supabase_db.py` | ETL : DROP CASCADE + reconstruction schéma + ingestion parquet enrichi |
+| `src/models/state.py` | `AgentState`, `EvaluationVerdict` (Pydantic) |
 
-Scrutinized architecture, unearthed dead code and correction loop flaws
-Scrutinized architecture, unearthed dead code and correction loop flaws
-J'ai lu le chat Gemini (« Graphe et Boucles ») et les fichiers du projet. Un point important d'abord : le PDF que j'ai reçu (LangGraph_HorRAGor__Graphe_et_Boucles.pdf) est en réalité la retranscription de ta conversation Gemini, pas le cahier des charges « HorRAGore 3 ». Je n'ai donc pas les directives officielles de l'exercice sous les yeux — je juge donc l'architecture sur ses mérites propres, et je te dirai où mon verdict dépendrait du spec que je ne vois pas.
+---
 
-Sur le fond : l'approche globale est saine. Le multi-agent en relais (sans superviseur central), l'isolation du contexte pour l'écrivain, et la boucle Juge avec coupe-circuit sont de bonnes décisions. Les compliments de Gemini là-dessus sont mérités. Mais il y a des failles réelles, dont une que Gemini a complètement ratée.
+## Problèmes connus et limitations assumées
 
-1. Le faux Scraper (Gemini a raison, et c'est même pire). Ton scraper_node n'émet jamais de tool_calls : il appelle scrape_detailed_synopsis.invoke(...) en dur et retourne {"web_anecdotes": [...]}. Donc la branche scraper_agent → tools est du code mort. Deux aggravations que Gemini n'a pas relevées : (a) ton tools_node = ToolNode(rag_tools) ne connaît que les outils RAG — scrape_detailed_synopsis n'y est même pas enregistré, donc la branche scraper_agent de route_after_tools est morte elle aussi ; (b) comme le scraper écrit dans web_anecdotes et pas dans messages, ton route_after_scraper lit un messages[-1] périmé (la réponse du RAG). Ça marche par accident, pas par design.
+- **Juge LLM imparfait** : le fact-check LLM rate parfois des hallucinations. Le garde-fou déterministe des années compense partiellement.
+- **Budget faiblement renseigné** : `budget_tmdb` à 20.6%. Assumé honnêtement par la Narration.
+- **Scraper réseau-dépendant** : si Wikipédia est inaccessible après les retries, la Narration dit « archives muettes ».
+- **`is_database_sufficient`** : CoT sous llama3.1, pas parfait. Peut mal router dans les cas ambigus.
 
-2. La « boucle de correction » n'en est pas une (Gemini a raté ça — c'est le point le plus grave). Quand le Juge refuse, il empile un HumanMessage « REFUSÉ » avec le motif. Mais regarde narration_node : il invoque le LLM avec [system_prompt, sterile_command] uniquement. Il ne passe jamais l'historique messages au modèle. Autrement dit, l'écrivain ne voit jamais la critique du Juge : il régénère à l'aveugle, avec exactement le même prompt, et compte sur le hasard de temperature=0.3 pour tomber mieux. Le « REFUSÉ » ne sert qu'à incrémenter ton compteur de sortie. Ce n'est pas une boucle de recadrage, c'est un retry aléatoire déguisé. Si tu veux une vraie correction, il faut réinjecter verdict["critique"] (ou le dernier message « REFUSÉ ») dans le prompt de narration_node.
+---
 
-3. Robustesse asymétrique. Ta boucle Juge a un coupe-circuit (2 refus → END, propre). Mais la boucle rag_agent ↔ tools n'en a aucune : si le LLM 8B re-demande des outils à chaque passage, tu tournes jusqu'au recursion_limit de LangGraph (25 par défaut) puis ça crashe au lieu de dégrader gracieusement. À surveiller.
+## État au moment de cette écriture
 
-4. Le drapeau is_database_sufficient. La critique finale de Gemini est juste : ta liste de mots-clés en dur (tournage/anecdote/secret) est aveugle à « coulisses », « making of », « fun fact »… Et le double appel LLM dans rag_node (le tool-bound puis l'extracteur structuré) coûte de la latence sur un 8B.
+- ✅ Pipeline complet fonctionnel (RAG → Scraper → Narration → Juge)
+- ✅ Résolution film correcte (`_resolve_media`)
+- ✅ Scraper API REST opérationnel (Ridley Scott récupéré depuis Wikipédia)
+- ✅ Zéro hallucination sur les cas testés (Alien 1979)
+- ✅ Base Supabase avec colonnes TMDB patchées (9421 réalisateurs)
+- ✅ Parquet enrichi en place (`horragor_enriched.parquet`, 25 colonnes)
+- ⬜ `rag_tool.py` pas encore mis à jour pour exposer `director`/`cast_top5` depuis Supabase
+- ⬜ Prompts Narration/Juge pas encore mis à jour pour autoriser le réalisateur depuis la base locale
 
-Sur la solution que Gemini te propose (ajouter un champ de raisonnement Chain-of-Thought dans RagHarvest avant le booléen) : c'est une amélioration correcte, mais elle soigne le symptôme. Le vrai problème est ailleurs — ton harvest_prompt établit que la base ne contient par conception aucune info de tournage/production. Donc la décision ne devrait pas être « le LLM juge-t-il ses données suffisantes ? » (tu demandes à un 8B d'être honnête sur ses propres limites, ce qu'il déteste faire), mais plutôt une classification d'intention de la question en amont : « cette question porte-t-elle sur la production/les coulisses ? → scraper, sinon → local ». Déterministe là où c'est possible, ça bat le self-grading. Le CoT peut compléter, pas remplacer.
+---
 
-Un dernier détail : le tout premier message de Gemini proposait un guardrail_node (rejet des requêtes hors-sujet type « météo »). Il n'a jamais été intégré — ton graphe démarre direct sur rag_agent. Selon ce que demande le cahier des charges HorRAGore 3, ça peut être une lacune ou non.
+## Prochaine étape logique
 
-Si tu m'envoies le vrai PDF des directives HorRAGore 3, je peux vérifier la conformité point par point plutôt que de deviner. Et si tu veux, je te réécris concrètement le narration_node pour que la boucle Juge corrige vraiment — c'est le correctif à plus fort impact.
-
-HorRAGor BOT Partie 3.pdf
-pdf
-
-ok et voici le lien github vers mon projet en etat https://github.com/AnnaVitry/HorRAGore_3.git
-
-
-Inventoried code against spec, identified discrepancies, resolved to verify GitHub implementation
-Inventoried code against spec, identified discrepancies, resolved to verify GitHub implementation
-Maintenant j'ai le vrai cahier des charges. Laisse-moi vérifier l'état actuel du repo pour combler les fichiers que je n'avais pas (main.py, config.py, le frontend) — ce sont justement ceux dont dépend une partie du verdict.
-
-
-Orchestrated API access pour contourner les restrictions web
-Orchestrated API access pour contourner les restrictions web
-web_fetch is blocked on GitHub, but mon environnement a un accès réseau à l'API GitHub. Je récupère l'arborescence et les fichiers manquants directement.
-
-
-Exécuté 2 commandes
-Exécuté 2 commandes
-API rate-limitée sur l'IP partagée. Je clone le repo directement (github.com est autorisé).
-
-
-Clone repo and list files
-Clone repo and list files
-Le repo est cloné. Je lis les fichiers clés que je n'avais pas — surtout main.py (pour vérifier Langfuse) et config.py.
-
-
-Scrutant la configuration du pipeline en mode autonome
-Scrutant la configuration du pipeline en mode autonome
-main.py récupéré. Un dernier point à vérifier : le frontend appelle-t-il bien l'API.
-
-
-Audité l'implémentation contre les spécifications et identifié des fonctionnalités non fonctionnelles
-Audité l'implémentation contre les spécifications et identifié des fonctionnalités non fonctionnelles
-J'ai maintenant le vrai cahier des charges et l'état actuel du repo (y compris main.py, config.py et le frontend que je n'avais pas). Verdict global d'abord : oui, c'est une bonne approche, et elle est même conforme au spec sur l'essentiel. Le problème n'est pas l'architecture — c'est que plusieurs fonctionnalités que tu as ajoutées au-delà du spec sont câblées mais mortes à l'exécution.
-
-Ce que le spec HorRAGore 3 demande, et que tu as bien. Le cahier des charges d'Antony ne réclame que trois choses structurantes : une architecture peer-to-peer sans manager central, trois agents (RAG → Scraper conditionnel → Narration) partageant un State, et l'isolation de la Narration. Les trois sont là. Ton narration_node est même exemplaire sur le point le plus subtil du spec (« isolé de toute la plomberie technique pour éviter la collision de tokens ») : tu n'injectes que local_lore et web_data, jamais les logs SQL ni les dumps Wikipédia. La séparation nodes / router (fonctions qui renvoient un str, testables unitairement) / pipeline respecte à la lettre les « règles d'or LangGraph » du PDF. Et Langfuse est bien intégré via CallbackHandler avec config={"callbacks":[...]} passé à l'invoke, comme demandé au chapitre Monitoring. Sur le contrat, tu es en règle.
-
-Petits écarts de nommage par rapport à l'arborescence du PDF, cosmétiques mais faciles à corriger si on te note dessus : le spec dit scraper_tool.py (tu as scrapper_tool.py, double p), app_frontend.py à la racine (tu as frontend/app.py), et « le fichier se termine par app = workflow.compile() » (tu nommes l'objet app_graph). Rien de grave.
-
-Maintenant les vrais problèmes, du plus grave au moins grave. Tous concernent des ajouts hors-spec (Juge, HITL, nœud tools), donc pas des manquements au cahier des charges — mais du code qui ne fait pas ce qu'il prétend faire, ce qui est exactement le genre de chose qu'un correcteur relève.
-
-1. Le Human-in-the-Loop est du code mort (nouveau, vu dans main.py). Ton main.py contient ~40 lignes de validation humaine : if state_info.next: → input("VALIDATION : Autoriser l'action ? (oui/non)") → reprise ou injection d'un ToolMessage de refus. Ce bloc suppose que le graphe se suspende avant tools. Or dans pipeline.py, la ligne interrupt_before=["tools"] est commentée et tu compiles en mode autonome (workflow.compile(checkpointer=memory)). Sans interruption, invoke va jusqu'à END, donc state_info.next est toujours vide → le bloc HITL ne s'exécute jamais. Soit tu réactives interrupt_before=["tools"] pour que la validation fonctionne, soit tu supprimes ce bloc de main.py. En l'état il donne l'illusion d'une feature qui n'existe pas au runtime.
-
-2. La « boucle de correction » du Juge ne corrige rien (confirmé dans nodes.py). C'est le point que Gemini a raté et que je maintiens. Le Juge empile un HumanMessage « REFUSÉ. Motif : … », mais narration_node invoque le LLM avec [system_prompt, sterile_command] uniquement — il ne passe jamais messages. L'écrivain ne voit donc jamais la critique : il régénère à l'identique en pariant sur le hasard de temperature=0.3. Ton compteur de « REFUSÉ » ne sert qu'à sortir de la boucle, pas à améliorer le texte. C'est un retry aléatoire déguisé en recadrage.
-
-3. Le faux Scraper et les branches tools mortes (confirmé). scraper_node appelle scrape_detailed_synopsis.invoke(...) en dur et retourne web_anecdotes — il n'émet jamais de tool_calls. Donc la branche scraper_agent → tools du pipeline ne se déclenche jamais. Pire : ton tools_node = ToolNode(rag_tools) ne connaît que les outils RAG, scrape_detailed_synopsis n'y est pas enregistré, donc la branche scraper_agent de route_after_tools est morte aussi. Ça « marche » parce que le flux passe toujours directement à la narration. Note : le spec parle d'un scraper_tool.py « natif » sans exiger qu'il soit un tool_call LangGraph — donc l'exécution synchrone est acceptable au regard du cahier des charges. Ce qu'il faut, c'est assumer ce choix et nettoyer les branches conditionnelles fantômes, sinon garder la cohérence est impossible.
-
-4. Aucun coupe-circuit sur la boucle rag_agent ↔ tools. Ta boucle Juge, elle, a son garde-fou (2 refus → END, propre et conforme à l'esprit du spec). Mais si le 8B redemande un outil à chaque passage RAG, tu montes jusqu'au recursion_limit de LangGraph (25 par défaut) et ça crashe au lieu de dégrader. Asymétrie à combler.
-
-5. Le drapeau is_database_sufficient (la critique finale de Gemini, toujours valide). Ta liste de mots-clés en dur (tournage/anecdote/secret) est aveugle à « coulisses », « making of », « fun fact ». Le CoT que Gemini propose aide, mais le fond du problème est que tu demandes à un 8B complaisant d'auto-évaluer ses propres lacunes. Plus robuste : classifier l'intention de la question en amont (« porte sur la production/coulisses ? → scraper ») plutôt que de faire auto-noter le modèle. Déterministe là où c'est possible.
-
-En résumé pour ta soutenance. Le socle demandé par le PDF est bon et conforme. Le risque, c'est que tu as greffé trois features non demandées (HITL, Juge-correcteur, Scraper agentique via tools) qui sont inertes au runtime. Deux stratégies défendables : soit tu les fais vraiment fonctionner, soit — vu que le spec ne demande que 3 agents + Langfuse — tu les retires pour livrer une version minimale mais honnête, où tout ce qui est câblé s'exécute réellement. Un correcteur préfère presque toujours 3 agents qui marchent à 6 dont la moitié sont du décor.
-
-Le correctif à plus fort impact reste le #2 : réinjecter verdict["critique"] dans le prompt de narration_node pour que la boucle corrige pour de vrai. Si tu veux, je te réécris ce nœud proprement, et je peux aussi te donner le patch pour trancher le #1 (HITL) dans un sens ou dans l'autre.
-
-
-Diagnosed budget data corruption and traced upstream ETL pipeline failure
-Diagnosed budget data corruption and traced upstream ETL pipeline failure
-« 0 partout » — ça change le diagnostic. Ton budget n'est ni NULL ni correct : il vaut 0. Donc ton outil SQL renvoie honnêtement « Budget: 0$ », le CoT interprète (raisonnablement) 0 comme « pas de vraie donnée » et dévie vers le Scraper, qui fait un no-op, et la narration comble le trou avec « 11 millions » tiré des connaissances de llama. La racine, c'est la donnée.
-
-J'ai justement ton fichier source dans le repo (data/horragor_final_data.parquet). Je peux vérifier tout de suite si le problème vient de l'ingestion (supabase_db.py qui perd le budget) ou de la source (le parquet n'a jamais eu de budgets) :
-
-
-Investigated données manquantes et interrogé fiabilité requête
-Investigated données manquantes et interrogé fiabilité requête
-La source elle-même a budget = 0 pour ces lignes — donc ce n'est pas ton ingestion, c'est la donnée d'origine. Mais je remarque un truc plus grave : ces 161 lignes « alien » sont des films obscurs (Alienation, Alien Tornado…), pas le Alien de Ridley Scott (1979). Or ton outil SQL fait ilike('%alien%').first() → il renvoie le premier match, probablement pas le bon film. Je creuse :
-
-
-Diagnosed budget data corruption and query retrieval misalignment issues
-Diagnosed budget data corruption and query retrieval misalignment issues
-Voilà le vrai diagnostic, et il est plus profond que « budget manquant ». Trois problèmes de données/récupération se cumulent :
-
-1. Ton outil SQL renvoie le mauvais film. query_movie_metadata fait ilike('%alien%').first() — or %alien% matche 161 films, et .first() (sans ORDER BY) attrape le premier physique, ici « Alienation » (2026), pas le Alien de Ridley Scott. Donc toute la métadonnée « récoltée » concernait probablement le mauvais film. Le vrai Alien (1979) existe bien dans ta base, mais il n'a jamais été ciblé.
-
-2. Le budget est vide sur TOUTE la base. 9978 lignes à 0, 0 ligne avec un budget > 0, le reste à null. Aucun film n'a de budget exploitable. Le Alien de Ridley Scott lui-même est à null. Donc aucune question budget ne peut être répondue depuis tes données — jamais.
-
-3. Il n'existe aucune colonne « réalisateur ». Donc « réalisé par Ridley Scott » est 100 % halluciné par llama. Comme « 1979 » (la ligne réellement lue, Alienation, est datée 2026) et comme « 11 millions ».
-
-Autrement dit : sur ta question, la quasi-totalité de la réponse était inventée, parce que (a) le mauvais film a été récupéré et (b) la narration comble tous les trous avec les connaissances de llama. C'est exactement le contraire de l'objectif « sans hallucination » du README.
-
-Je vérifie un dernier point : tu as une classe FastMovieRouter (FAISS) dans rag_tool.py censée résoudre le bon film — est-elle seulement utilisée ?
-
-
-Diagnostiqué dysfonctionnement de recherche et hiérarchisé corrections prioritaires
-Diagnostiqué dysfonctionnement de recherche et hiérarchisé corrections prioritaires
-Dernière pièce du puzzle : FastMovieRouter (ta désambiguïsation FAISS) est défini mais jamais appelé — encore du code mort. Ton outil se contente donc du ilike().first(), d'où le mauvais film. Le diagnostic est complet.
-
-Récapitulatif du bug (une seule cause en cascade)
-Ta question « budget d'Alien » a échoué en chaîne : le SQL a récupéré le mauvais film (Alienation 2026 au lieu d'Alien 1979), la base n'a aucun budget (0/null partout) ni aucun réalisateur, et la narration a tout inventé pour combler. Le CoT, lui, a plutôt bien joué son rôle (il a vu que le budget manquait). Le problème n'est pas ton graphe — il est dans la récupération et dans l'honnêteté de l'Écrivain.
-
-Plan de correctifs, par priorité
-Fix 1 — Désambiguïser query_movie_metadata (le plus important). Remplacer ilike('%x%').first() par : match exact d'abord (title == référence), puis à défaut le plus court titre contenant la requête (« Alien » gagne contre « Alienation »/« Alien Nation »). Ça garantit qu'on lit le bon film. Plus simple et plus fiable que de réveiller le FastMovieRouter FAISS (dont le seuil 0.5 est lui-même fragile, comme le note ton propre commentaire).
-
-Fix 2 — Anti-hallucination de la narration (critique vu la donnée creuse). Interdire explicitement à l'Écrivain d'utiliser ses connaissances hors des données fournies ; si une info est absente, il doit la déclarer « inconnue » avec cynisme plutôt que l'inventer. C'est ce qui sert directement le « sans hallucination » du README, et sans ça, avec une base à 99,5 % de budgets vides, llama comblera toujours.
-
-Fix 3 — Présenter proprement les champs absents. Dans l'outil SQL, quand budget/revenue/note valent 0 ou null, renvoyer « non renseigné » au lieu de « 0$ ». Ça évite que le CoT prenne un 0 pour une vraie valeur et que le budget vide déclenche le Scraper à tort.
-
-Fix 4 — Fallback du Scraper (secondaire). Forcer le tool_call si llama ne l'émet pas. Utile, mais moins urgent que 1–3.
-
-Un point stratégique honnête : avec ces données (pas de budget, pas de réalisateur), ton bot est fort sur le synopsis, les notes, les recommandations (pgvector), la date, l'univers et les anecdotes scrapées — mais budget et réalisateur ne sont tout simplement pas dans la donnée. Le Fix 2 le fera dire élégamment.
-
-Je propose d'attaquer Fix 1 + 3 + 2 ensemble (c'est le trio qui répare précisément ton test Alien), puis le Fix 4 juste après. Je te les prépare dans cet ordre, ou tu veux commencer par un autre ?
-
-ok allon y
-
-
-Architected systematic code fixes with helper function extraction and validation
-Architected systematic code fixes with helper function extraction and validation
-« Allons-y ». Je fais le trio Fix 1 + 3 + 2. Je commence par rag_tool.py. Je regarde le texte exact à modifier :
-
-
-Reconfigured SQLAlchemy imports strategically
-Reconfigured SQLAlchemy imports strategically
-Fix 1 (désambiguïsation) + Fix 3 (champs absents honnêtes). D'abord l'import sqlalchemy (or_ n'est plus utile, j'ajoute func) :
-
-
-Swap or_ for func in sqlalchemy imports
-Swap or_ for func in sqlalchemy imports
-J'ajoute le helper de résolution _resolve_media juste après la connexion. Je récupère l'ancre exacte :
-
-
-A exécuté une commande, fichier modifié
-A exécuté une commande, fichier modifié
-Maintenant query_movie_metadata : résolution correcte + présentation honnête des champs à 0/null :
-
-
-Use resolver and present missing budget/note/date honestly
-Use resolver and present missing budget/note/date honestly
-Même correction de résolution dans find_similar_horror_movies (sinon les recommandations partent aussi du mauvais film) :
-
-
-Examined narration system to eliminate hallucinations
-Examined narration system to eliminate hallucinations
-rag_tool.py fait. Fix 2 — anti-hallucination de la narration dans nodes.py :
-
-
-Verified code compilation and tested disambiguation logic
-Verified code compilation and tested disambiguation logic
-Je compile, je vérifie qu'il ne reste pas de or_ orphelin, et surtout je valide l'heuristique de désambiguïsation sur tes vraies données (le plus court titre contenant « alien » doit bien être « Alien ») :
-
-
-Compile, check orphan or_, validate disambiguation heuristic on real data
-Compile, check orphan or_, validate disambiguation heuristic on real data
-
-Claude a terminé la réponse.
-HorRAGor BOT Partie 3.pdf
-pdf
-
-DEVIA 25 - IA Agentic.pdf
-pdf
-
-
-LangGraph HorRAGor_ Graphe et Boucles.pdf pdf router.py 79 lignes py pipeline.py 106 lignes py nodes.py 208 lignes py state.py 39 lignes py chat_models.py 25 lignes py scrapper_tool.py 66 lignes py rag_tool.py 197 lignes py misc_tools.py 28 lignes py README.md 179 lignes m
-
-pasted
-
-https://github.com/AnnaVitry/HorRAGore_3.git
-sur la branch debug/tool-scraper-real-agentic
-
-
-Orchestrated code review strategy for debugging branch
-Orchestrated code review strategy for debugging branch
-Je regarde cette branche pour voir ce que tu as implémenté sur le scraper agentique. Je clone et je bascule dessus.
-
-
-Rectified branch nomenclature discrepancy for accurate repository checkout
-Rectified branch nomenclature discrepancy for accurate repository checkout
-La branche existe bien (avec des underscores : debug/tool_scraper_real_agentic, pas des tirets — je prends celle-là). Je bascule dessus et je regarde ce qui a changé par rapport à main.
-
-
-Bascule sur la branche et compare à main
-Bascule sur la branche et compare à main
-Il y a du vrai travail ici, et ton propre message de commit signale déjà un bug résiduel (« scrapper est skippé et passe la main du juge au narrateur directement »). Je lis les fichiers clés pour comprendre exactement où ça coince.
-
-
-Examined node implementations pour scraper, RAG, et narration
-Examined node implementations pour scraper, RAG, et narration
-Le routeur a bien été retravaillé (coupe-circuit sur les outils désormais, MAX_TOOL_LOOPS = 4). Je lis maintenant nodes.py, le cœur du sujet.
-
-
-Investigated pipeline routing logic pour identifier pourquoi scraper s'exécute pas
-Investigated pipeline routing logic pour identifier pourquoi scraper s'exécute pas
-Beaucoup de choses ont été corrigées ici — bien plus que sur main. Je vérifie le câblage dans pipeline.py et le state.py, puis je regarde main.py, pour comprendre pourquoi le scraper reste skippé.
-
-
-Investigated routing logic and scraper skip bug origins
-Investigated routing logic and scraper skip bug origins
-Le dernier commit ajoute un claude.md (« claude historic pour la prochaine debug ») — c'est visiblement une note de passation laissée pour cette session. Je la lis en priorité, puis je regarde les outils pour comprendre le « scraper skippé ».
-
-
-Diagnosed scraper-skipping bug by tracing decision logic flow
-Diagnosed scraper-skipping bug by tracing decision logic flow
-C'est la passation complète de la session précédente — j'ai tout le fil. Deux derniers fichiers à vérifier pour diagnostiquer le « scraper skippé » proprement : l'outil SQL (est-ce que les Fix 1/3 ont bien atterri sur cette branche ?) et l'outil scraper lui-même.
-
-
-Investigated code discrepancies et divergences entre documentation et implémentation réelle
-Investigated code discrepancies et divergences entre documentation et implémentation réelle
-Ça, c'est une découverte importante. Le claude.md (passation) décrit des Fix 1 + 3 appliqués à rag_tool.py (désambiguïsation par titre le plus court + champs manquants affichés « non renseigné » au lieu de « 0$ »). Or sur cette branche, rag_tool.py a toujours l'ancien code : or_(...) + ilike("%...%"). Je confirme sur la suite du fichier et dans l'historique git.
-
-
-Diagnosed missing code fixes et scraper routing ambiguities
-Diagnosed missing code fixes et scraper routing ambiguities
-Diagnostic confirmé, et c'est un point clé. Je vérifie un dernier fichier (main.py, pour le HITL) puis je te fais la synthèse.
-
-
-Diagnosed missing fixes and routing fragility, needs test query clarification
-Diagnosed missing fixes and routing fragility, needs test query clarification
-J'ai fait le tour de la branche. Voici l'état réel, vérifié fichier par fichier, avant qu'on décide de la suite.
-
-Ce qui a bien atterri sur debug/tool_scraper_real_agentic (et c'est du solide) :
-
-La boucle du Juge corrige enfin pour de vrai — c'était le correctif #2, le plus important. narration_node récupère maintenant verdict["critique"] et le réinjecte dans le system prompt (le bloc correction, lignes 190-199), donc l'Écrivain voit le motif du refus au lieu de régénérer à l'aveugle. Le scraper est devenu authentiquement agentique : nœud à deux passages (1er = émission d'un vrai tool_call, 2e = récolte du ToolMessage dans web_anecdotes), le ToolNode enregistre désormais rag_tools + scraper_tools, et route_after_tools renvoie bien vers scraper_agent quand l'outil appelé était Wikipédia. Il y a aussi un coupe-circuit sur la boucle rag ↔ tools (MAX_TOOL_LOOPS = 4), le HITL mort a été retiré de main.py, et scrapper_tool.py est renommé scraper_tool.py (conforme au spec). Sur la plomberie, cette branche est bien meilleure que main.
-
-Le problème que je dois te signaler tout de suite : les Fix 1 et Fix 3 décrits dans ton claude.md ne sont pas dans le code de cette branche. J'ai vérifié : rag_tool.py est identique à main (git diff main...debug -- rag_tool.py est vide), et aucun commit sur aucune branche n'a jamais introduit _resolve_media, func, ni « non renseigné ». Concrètement :
-
-query_movie_metadata fait toujours or_(... ilike("%ref%")).first() → il récupère encore le mauvais film (Alienation 2026 au lieu d'Alien 1979). Le correctif #1, qui était pourtant la priorité n°1 du diagnostic précédent, a été fait dans le bac à sable de la session d'avant mais jamais commité.
-Le budget est toujours renvoyé en Budget: {media.budget}$ → donc 0$ au lieu de « non renseigné ». Fix 3 absent lui aussi.
-Autrement dit, la session précédente a écrit ces correctifs mais ils ont été perdus au moment de pousser. À moins que tu les aies en local non commité, ils sont à refaire.
-
-Sur le « scraper skippé » de ton commit : maintenant que la plomberie est correcte, le skip n'est plus un bug de câblage — c'est une décision de routage, pilotée uniquement par is_database_sufficient, c'est-à-dire l'auto-notation du CoT par llama. Et c'est exactement la fragilité pointée au point #5 de la session d'avant : on demande à un 8B d'être honnête sur ses propres lacunes. Deux cas possibles selon ta question de test, et c'est là que j'ai besoin de toi pour ne pas deviner à ta place :
-
-si tu as testé une question répondable en local (note, date, synopsis), alors skipper le scraper est le comportement correct, pas un bug ;
-si tu as testé une question coulisses/tournage/anecdote et que le scraper a quand même été sauté, alors le CoT a renvoyé True à tort → là c'est un vrai bug de décision.
-Le harvest_prompt dit pourtant explicitement « tournage/coulisses → is_database_sufficient = False », donc pour une question de coulisses il devrait dévier. S'il ne le fait pas, c'est llama qui ne suit pas sa consigne — et le correctif robuste reste la classification d'intention déterministe en amont, plutôt que le self-grading.
-
-Quelle était la question exacte que tu as tapée quand tu as vu le scraper être sauté ? Ça tranche entre « bug » et « comportement normal ». Et dans la foulée : tu veux que je te réapplique les Fix 1 + 3 perdus (le mauvais film, c'est vraiment le bug le plus grave côté données), que je fiabilise le routage vers le scraper, ou les deux ?
-
-Autrement dit, la session précédente a écrit ces correctifs mais ils ont été perdus au moment de pousser. À moins que tu les aies en local non commité, ils sont à refaire. => Ils n'ont pas été implémentés encore; nous nous étions arrété avant de mettre en place ces debug. Commencons à le faire
-
-
-Orchestrated refactoring strategy pour implémenter deux correctifs manqués
-Orchestrated refactoring strategy pour implémenter deux correctifs manqués
-On y va. Je réimplémente Fix 1 (bon film) + Fix 3 (champs honnêtes) dans rag_tool.py, sur cette branche. D'abord je regarde le schéma exact de tes tables et je récupère le parquet pour tester l'heuristique de désambiguïsation sur tes vrais titres (sans DB ni Ollama, en pur Python).
-
-
-Architected trois correctifs : désambiguïsation, formatage métadonnées, et gestion budget
-Architected trois correctifs : désambiguïsation, formatage métadonnées, et gestion budget
-Schéma clair : Media a budget/revenue en BigInteger default=0 (donc 0 = manquant, comme diagnostiqué), release_date nullable, et la note vit dans Score.value. Avant d'écrire le code, je valide l'heuristique de désambiguïsation (« titre le plus court contenant la référence ») sur tes vrais titres du parquet, pour être sûr qu'« Alien » gagne bien contre « Alienation ».
-
-
-Validé deux stratégies de correction et examiné l'état du budget
-Validé deux stratégies de correction et examiné l'état du budget
-Parfait, l'heuristique est validée sur tes vraies données : l'ancien .first() renvoyait bien « Alienation » (le bug), le match exact trouve directement « Alien » (il existe tel quel), et le fallback « plus court » donne aussi « Alien ». Les deux chemins convergent vers le bon film. Petit contrôle sur la ligne « Alien » et sur les budgets, pour savoir ce que l'outil affichera après le Fix 3.
-
-
-Orchestrated données cinématographiques et planifié implémentation des correctifs
-Orchestrated données cinématographiques et planifié implémentation des correctifs
-Tout est confirmé : le vrai « Alien » (1979, note 8.17, Horreur) existe et sera désormais ciblé ; son budget est null (0 pour tous les 10 033 films) → le Fix 3 affichera « non renseigné » honnêtement. J'implémente. Je relis les ancrages exacts avant d'éditer.
-
-
-Ancrage exact query_movie_metadata
-Ancrage exact query_movie_metadata
-Maintenant les éditions. D'abord l'import (func en plus, or_ conservé pour le match exact) :
-
-
-Ajoute func à l'import sqlalchemy
-Ajoute func à l'import sqlalchemy
-J'ajoute le résolveur _resolve_media juste après la connexion (fonction pure, testable, comme le veut l'esprit du spec) :
-
-
-Ajoute le helper _resolve_media après SessionLocal
-Ajoute le helper _resolve_media après SessionLocal
-Fix 1 + Fix 3 dans query_movie_metadata (résolution correcte + champs 0/null affichés « non renseigné ») :
-
-
-Résolution correcte + présentation honnête dans query_movie_metadata
-Résolution correcte + présentation honnête dans query_movie_metadata
-Même résolution dans find_similar_horror_movies (sinon les recommandations repartent du mauvais film) :
-
-
-Vérifié la syntaxe et harmonisé le code avec les standards du projet
-Vérifié la syntaxe et harmonisé le code avec les standards du projet
-Éditions faites. Je vérifie la syntaxe, l'absence d'import orphelin, et je passe le linter (le repo utilise Ruff d'après l'historique de commits).
-
-
-Vérifiant la cohérence du code et validant la syntaxe SQLAlchemy
-Vérifiant la cohérence du code et validant la syntaxe SQLAlchemy
-Tout est vert : syntaxe OK, or_ et func bien utilisés (pas d'import orphelin), et Ruff passe. Voici le diff complet de rag_tool.py.
-
-
-Validated fixes partiellement, identifié implémentation manquante, priorisé prochaines étapes
-Validated fixes partiellement, identifié implémentation manquante, priorisé prochaines étapes
-C'est en place. Les deux correctifs sont écrits, validés sur tes vrais titres du parquet, et Ruff passe. Concrètement, sur ton test « budget d'Alien » :
-
-Avant, l'outil résolvait vers Alienation (2026) et renvoyait Budget: 0$ — d'où toute la cascade d'hallucinations. Après, _resolve_media tombe d'abord sur le match exact Alien (1979-05-25, note 8.17, Univers Horreur), et le rendu devient honnête : Sortie: 1979-05-25, Budget: non renseigné, Note: 8.17/10. Le mauvais film et le faux « 0$ » disparaissent tous les deux, et find_similar_horror_movies part maintenant du bon film lui aussi.
-
-Une réserve d'honnêteté : j'ai validé l'heuristique contre le parquet (les 10 033 titres qui alimentent la base via supabase_db.py), pas contre ton Postgres en direct — je n'ai ni tes identifiants Supabase ni Ollama ici. Le SQL est du standard Postgres (func.lower, func.length, ilike + order_by), donc ça devrait passer tel quel, mais la preuve finale reste un run réel de ton côté.
-
-Je te sors le patch applicable directement, pour que tu n'aies pas à recopier le diff à la main.
-
-
-Identifié l'absence de correctifs et priorisé l'implémentation anti-hallucination
-Identifié l'absence de correctifs et priorisé l'implémentation anti-hallucination
-Pour l'appliquer chez toi : git apply fix1_fix3_rag_tool.patch depuis la racine du repo (ou remplace directement src/tools/rag_tool.py par le fichier complet), puis commit sur la branche.
-
-Un point pour la suite : dans le plan « trio » de la session d'avant, il restait le volet anti-hallucination de la narration — et lui non plus n'est pas dans le code de cette branche. Le system_prompt de narration_node ne dit nulle part à l'Écrivain de s'en tenir aux données fournies. Avec une base à quasi 100 % de budgets vides et sans réalisateur, llama continuera à combler les trous (« budget de 11 millions », « réalisé par… ») même une fois le bon film récupéré. C'est le correctif qui sert directement l'objectif « sans hallucination » du README.
-
-Tu veux que j'enchaîne sur cette règle anti-hallucination dans narration_node, ou tu préfères d'abord faire tourner un run réel avec ces deux fix-là pour vérifier que la résolution SQL passe bien sur ton Postgres ?
-
-
-Fix1 fix3 rag tool
-PATCH 
-
-Rag tool
-PY 
-Je lis d'abord le README actuel du repo pour voir ce qui existe déjà avant de modifier.
-
-
-Lit le README actuel du repo
-Lit le README actuel du repo
-J'ai tout ce qu'il faut. Je mets à jour : arborescence (nouveaux fichiers), section .env (TMDB_API_KEY), section Démarrage (enrichissement TMDB en étape 0), agents (précisions sur le Juge et le Scraper), et anti-hallucination dans les règles de contribution.
-
-
-Exécuté 2 commandes, lu un fichier
-Exécuté 2 commandes, lu un fichier
-Voici ce qui a changé par rapport à l'original :
-
-Arborescence — ajout de example.env, enrich_parquet.py, patch_tmdb_columns.py, horragor_enriched.parquet, et commentaires précis sur config.py (détection auto du parquet enrichi) et scraper_tool.py (API REST directe).
-
-Agents — descriptions bien plus précises : _resolve_media, vérité-terrain SQL brute, garde-fou déterministe des années, fallback forcé du scraper, règle réalisateur/casting. Ce sont les vraies décisions d'architecture qu'on a prises ensemble, pas juste une description générique.
-
-Stack technique — transformé en tableau, avec TMDB en ligne supplémentaire.
-
-.env — mis à jour avec TMDB_API_KEY + instruction cp example.env .env + avertissement gitignore.
-
-Démarrage — Étape 0 ajoutée (enrichissement TMDB), mention de patch_tmdb_columns.py pour les mises à jour sans reconstruction, étapes renumérotées.
-
-Nouvelle section 🗂️ Gestion du Parquet — explique la différence entre les deux parquets et la sélection automatique.
-
-Contribution — règles plus précises alignées sur ce qu'on a réellement codé (Context Trimming, testabilité unitaire, déclaration des champs absents).
-
-
-Readme
-Document · MD 
-donne moi un commentaire court et concis pour le commit
-
-docs(readme): mise à jour architecture, enrichissement TMDB et anti-hallucination
-config.py cherche horragor_enriched.parquet en priorité — mais il n'existe pas encore car enrich_parquet.py ne s'est pas terminé correctement (tu l'avais interrompu). Donc il a pris le parquet original, sans les colonnes TMDB.
-
-Le workflow à suivre demain :
-
-bash
-# 1. Enrichissement complet (ne pas interrompre, ~15 min)
-python enrich_parquet.py --api-key f9578bf36c1fd70ab97579e1168d914a
-
-# 2. Une fois le rapport final affiché, relancer supabase_db.py
-#    Cette fois il verra horragor_enriched.parquet et ingérera les colonnes TMDB
-uv run python supabase_db.py
-
-La base actuelle est propre (10033 films, schéma avec les nouvelles colonnes), juste les colonnes TMDB sont toutes à NULL. Demain après le step 2, director, cast_top5, genres etc. seront remplis.
-
-ok mais je voulais que à la création de la avec supabase_db.py cette ingestion se fasse toute seule en un fichier.
-
-Ah oui, je comprends — tu veux que supabase_db.py lance lui-même l'enrichissement TMDB si la clé est présente, sans avoir à lancer enrich_parquet.py séparément. Un seul script, un seul python supabase_db.py. Je modifie le bloc __main__ pour intégrer ça.
-
-A consulté 2 fichiers, fichier modifié, a exécuté une commande
-A consulté 2 fichiers, fichier modifié, a exécuté une commande
-
-Voilà. Maintenant python supabase_db.py fait tout seul :
-
-🦇 Réveil de l'architecture Supabase...
-🎬 Clé TMDB détectée (****914a). Parquet enrichi absent.
-🚀 Lancement automatique de l'enrichissement TMDB...
-   (cela prend ~15 minutes pour 10 033 films — ne pas interrompre)
-
-[enrichissement en cours...]
-
-🗄️ Initialisation du MPD...
-📖 Lecture du grimoire de données (enrichi) : .../horragor_enriched.parquet
-✨ Colonnes TMDB détectées — enrichissement activé.
-
-La logique est simple : si TMDB_API_KEY est dans le .env et que horragor_enriched.parquet n'existe pas encore → enrichissement automatique avant l'ingestion. Si le parquet enrichi existe déjà (deuxième lancement) → il le prend directement sans re-enrichir. Sans clé → parquet original, comportement identique à avant.
-
-Demain tu supprimes le horragor_enriched.parquet partiel qui traîne et tu lances juste uv run python supabase_db.py — il gérera tout.
-
-Supabase db
-PY 
-
-du coup le enrich_parquet. py sera suprimable et je n'aurai plus q'un fichier à lancer ?
-
-Pas tout à fait. enrich_parquet.py reste utile, mais il n'est plus obligatoire pour le premier lancement.
-
-Concrètement :
-
-supabase_db.py seul suffit pour le cas normal — première installation, base vide, parquet enrichi absent. Il appelle enrich_main() en interne.
-
-enrich_parquet.py reste utile pour deux cas spécifiques :
-
-Mise à jour partielle — si TMDB ajoute des données pour des films qui n'étaient pas renseignés, tu peux re-enrichir le parquet sans reconstruire toute la base (combiné avec patch_tmdb_columns.py).
-Débogage — si l'enrichissement plante en milieu de course dans supabase_db.py, le checkpoint est sauvegardé et tu peux reprendre avec enrich_parquet.py directement au lieu de tout relancer.
-
-Donc le workflow normal devient bien un seul fichier :
-
-bash
-uv run python supabase_db.py   # fait tout : enrichit + reconstruit + ingère
-
-Et enrich_parquet.py + patch_tmdb_columns.py restent dans le repo comme outils de maintenance, pas comme prérequis obligatoires. Je mettrais à jour le README en ce sens — une ligne dans la section Démarrage pour clarifier ça.
-
-Oui exactement. enrich_parquet.py prend horragor_final_data.parquet (16 colonnes) et produit horragor_enriched.parquet (25 colonnes) — c'est un parquet complet qui contient tout l'original plus les nouvelles colonnes TMDB.
-
-Donc supprimer horragor_final_data.parquet est sans risque : horragor_enriched.parquet le remplace à 100%.
-
-La seule raison de garder l'original serait si tu voulais un jour re-générer le parquet enrichi from scratch — mais puisqu'on retire enrich_parquet.py du repo, ce scénario ne se posera plus. Le parquet enrichi est ta source de vérité définitive, à conserver précieusement.
+Mettre à jour `query_movie_metadata` dans `rag_tool.py` pour exposer `director`, `cast_top5`, `genres`, `runtime` depuis Supabase. Une question « qui a réalisé Alien ? » pourrait alors être répondue en local sans scraper. Implique aussi de mettre à jour :
+1. Le CoT de `is_database_sufficient` → le réalisateur est maintenant disponible localement
+2. La règle 2 de la Narration → autoriser le réalisateur depuis les données locales
+3. La règle 2 du Juge → vérifier le réalisateur contre les sources locales ET web
