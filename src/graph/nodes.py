@@ -128,11 +128,6 @@ def rag_node(state: AgentState) -> dict[str, Any]:
     raw_tool_outputs = [str(m.content) for m in messages if isinstance(m, ToolMessage)]
     local_facts = "\n".join(raw_tool_outputs)
 
-    # Debug temporaire : affiche ce qui arrive vraiment à la Narration
-    print(f"🔍 [RAG DEBUG] Types de messages : {[type(m).__name__ for m in messages]}")
-    print(f"🔍 [RAG DEBUG] ToolMessages trouvés : {len(raw_tool_outputs)}")
-    print(f"🔍 [RAG DEBUG] local_facts (200 premiers car.) : {local_facts[:200]!r}")
-
     # Garde-fou anti-hallucination de succès : si les faits bruts sont vides ou
     # négatifs, on refuse la sortie locale même si le LLM s'est déclaré satisfait.
     if final_decision is True and _lore_looks_empty(local_facts):
