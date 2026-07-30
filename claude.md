@@ -415,10 +415,69 @@ Document · MD
 donne moi un commentaire court et concis pour le commit
 
 docs(readme): mise à jour architecture, enrichissement TMDB et anti-hallucination
+config.py cherche horragor_enriched.parquet en priorité — mais il n'existe pas encore car enrich_parquet.py ne s'est pas terminé correctement (tu l'avais interrompu). Donc il a pris le parquet original, sans les colonnes TMDB.
 
+Le workflow à suivre demain :
 
+bash
+# 1. Enrichissement complet (ne pas interrompre, ~15 min)
+python enrich_parquet.py --api-key f9578bf36c1fd70ab97579e1168d914a
 
+# 2. Une fois le rapport final affiché, relancer supabase_db.py
+#    Cette fois il verra horragor_enriched.parquet et ingérera les colonnes TMDB
+uv run python supabase_db.py
 
+La base actuelle est propre (10033 films, schéma avec les nouvelles colonnes), juste les colonnes TMDB sont toutes à NULL. Demain après le step 2, director, cast_top5, genres etc. seront remplis.
 
+ok mais je voulais que à la création de la avec supabase_db.py cette ingestion se fasse toute seule en un fichier.
 
-Claude est une IA et peut faire des erreurs. Veuillez vérifier les réponses.
+Ah oui, je comprends — tu veux que supabase_db.py lance lui-même l'enrichissement TMDB si la clé est présente, sans avoir à lancer enrich_parquet.py séparément. Un seul script, un seul python supabase_db.py. Je modifie le bloc __main__ pour intégrer ça.
+
+A consulté 2 fichiers, fichier modifié, a exécuté une commande
+A consulté 2 fichiers, fichier modifié, a exécuté une commande
+
+Voilà. Maintenant python supabase_db.py fait tout seul :
+
+🦇 Réveil de l'architecture Supabase...
+🎬 Clé TMDB détectée (****914a). Parquet enrichi absent.
+🚀 Lancement automatique de l'enrichissement TMDB...
+   (cela prend ~15 minutes pour 10 033 films — ne pas interrompre)
+
+[enrichissement en cours...]
+
+🗄️ Initialisation du MPD...
+📖 Lecture du grimoire de données (enrichi) : .../horragor_enriched.parquet
+✨ Colonnes TMDB détectées — enrichissement activé.
+
+La logique est simple : si TMDB_API_KEY est dans le .env et que horragor_enriched.parquet n'existe pas encore → enrichissement automatique avant l'ingestion. Si le parquet enrichi existe déjà (deuxième lancement) → il le prend directement sans re-enrichir. Sans clé → parquet original, comportement identique à avant.
+
+Demain tu supprimes le horragor_enriched.parquet partiel qui traîne et tu lances juste uv run python supabase_db.py — il gérera tout.
+
+Supabase db
+PY 
+
+du coup le enrich_parquet. py sera suprimable et je n'aurai plus q'un fichier à lancer ?
+
+Pas tout à fait. enrich_parquet.py reste utile, mais il n'est plus obligatoire pour le premier lancement.
+
+Concrètement :
+
+supabase_db.py seul suffit pour le cas normal — première installation, base vide, parquet enrichi absent. Il appelle enrich_main() en interne.
+
+enrich_parquet.py reste utile pour deux cas spécifiques :
+
+Mise à jour partielle — si TMDB ajoute des données pour des films qui n'étaient pas renseignés, tu peux re-enrichir le parquet sans reconstruire toute la base (combiné avec patch_tmdb_columns.py).
+Débogage — si l'enrichissement plante en milieu de course dans supabase_db.py, le checkpoint est sauvegardé et tu peux reprendre avec enrich_parquet.py directement au lieu de tout relancer.
+
+Donc le workflow normal devient bien un seul fichier :
+
+bash
+uv run python supabase_db.py   # fait tout : enrichit + reconstruit + ingère
+
+Et enrich_parquet.py + patch_tmdb_columns.py restent dans le repo comme outils de maintenance, pas comme prérequis obligatoires. Je mettrais à jour le README en ce sens — une ligne dans la section Démarrage pour clarifier ça.
+
+Oui exactement. enrich_parquet.py prend horragor_final_data.parquet (16 colonnes) et produit horragor_enriched.parquet (25 colonnes) — c'est un parquet complet qui contient tout l'original plus les nouvelles colonnes TMDB.
+
+Donc supprimer horragor_final_data.parquet est sans risque : horragor_enriched.parquet le remplace à 100%.
+
+La seule raison de garder l'original serait si tu voulais un jour re-générer le parquet enrichi from scratch — mais puisqu'on retire enrich_parquet.py du repo, ce scénario ne se posera plus. Le parquet enrichi est ta source de vérité définitive, à conserver précieusement.
