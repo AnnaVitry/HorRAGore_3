@@ -18,20 +18,14 @@ HorRAGore_3/
 ├── example.env                   # Template documenté avec instructions par variable
 ├── pyproject.toml / uv.lock      # Fichiers de gestion des dépendances via 'uv'
 ├── supabase_db.py                # Script ETL : reconstruit les tables et insère les données
-├── enrich_parquet.py             # Enrichissement du parquet via API TMDB
-│                                 # (réalisateur, casting, genres, budget réel...)
-├── patch_tmdb_columns.py         # Patch SQL ciblé : met à jour les colonnes TMDB
-│                                 # sans DROP ni recalcul des vecteurs
 │
 ├── data/                         # Stockage des données locales
-│   ├── horragor_final_data.parquet   # Dataset source brut (10 033 films d'horreur)
-│   ├── horragor_enriched.parquet     # Dataset enrichi TMDB (généré par enrich_parquet.py)
-│   └── faiss_index.bin               # Cache vectoriel local (généré automatiquement)
+│   ├── horragor_enriched.parquet # Dataset source brut (10 033 films d'horreur) enrichi TMDB
+│   └── faiss_index.bin           # Cache vectoriel local (généré automatiquement)
 │
 ├── src/                          # 🧠 CŒUR DU BACKEND (FastAPI & LangGraph)
 │   ├── main.py                   # Point d'entrée de l'API, gère le cycle de vie
 │   ├── config.py                 # Source de vérité : chemins absolus, clés, modèles
-│   │                             # Détecte automatiquement horragor_enriched.parquet
 │   ├── graph/
 │   │   ├── nodes.py              # Définition des 4 Agents (RAG, Scraper, Narration, Juge)
 │   │   ├── router.py             # Logique décisionnelle et aiguillage des agents
@@ -145,9 +139,6 @@ SUPABASE_URL="postgresql://postgres.[id]:[mot de passe]@aws-0-eu-west-1.pooler.s
 LANGFUSE_PUBLIC_KEY="pk-lf-..."
 LANGFUSE_SECRET_KEY="sk-lf-..."
 LANGFUSE_HOST="http://localhost:3000"
-
-# Enrichissement TMDB (https://www.themoviedb.org/settings/api → API Key, 32 caractères)
-TMDB_API_KEY=""
 ```
 
 > ⚠️ Ne commite **jamais** le fichier `.env`. Vérifie que `.gitignore` le contient.
@@ -156,24 +147,9 @@ TMDB_API_KEY=""
 
 ## 🏁 Démarrage du Système
 
-### Étape 0 : Enrichissement des données (première fois uniquement)
-
-Avant d'ingérer les données, enrichis le parquet source avec les métadonnées TMDB (réalisateur, casting, genres, budget réel, durée). Cette étape prend environ 15 minutes pour 10 033 films. Elle est **interruptible** : un checkpoint est sauvegardé toutes les 500 lignes.
-
-```bash
-python enrich_parquet.py --api-key $TMDB_API_KEY
-```
-
-Le parquet enrichi est sauvegardé dans `data/horragor_enriched.parquet`. `config.py` le détecte automatiquement et `supabase_db.py` l'utilisera à l'étape suivante.
-
-> **Mise à jour sans reconstruction complète** : si la base est déjà en place et que tu veux juste ajouter les colonnes TMDB sans recalculer les vecteurs, utilise à la place :
-> ```bash
-> python patch_tmdb_columns.py
-> ```
-
 ### Étape 1 : Ingestion des données
 
-Lance le pipeline ETL pour construire les tables (schéma complet avec colonnes TMDB) et calculer les vecteurs sémantiques. Patientez jusqu'à la fin de la génération des embeddings.
+Lance le pipeline ETL pour construire les tables et calculer les vecteurs sémantiques. Patientez jusqu'à la fin de la génération des embeddings.
 
 ```bash
 uv run python supabase_db.py
@@ -199,10 +175,9 @@ uv run streamlit run frontend/app.py
 
 | Fichier | Rôle | Colonnes clés |
 |---|---|---|
-| `horragor_final_data.parquet` | Source brute (ne pas modifier) | title, release_date, vote_average, overview |
-| `horragor_enriched.parquet` | Source enrichie (généré par `enrich_parquet.py`) | + director, cast_top5, genres, runtime, tagline, budget_tmdb |
+| `horragor_enriched.parquet` | Source de vérité unique (25 colonnes) | title, release_date, vote_average, overview, director, cast_top5, genres, runtime, tagline, budget_tmdb |
 
-`config.py` sélectionne automatiquement le parquet enrichi s'il existe, sinon bascule sur l'original.
+`config.py` pointe directement vers ce fichier. À conserver précieusement — il est la source de toute reconstruction de la base.
 
 ---
 
