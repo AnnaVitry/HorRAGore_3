@@ -18,11 +18,8 @@ if not SUPABASE_URL:
         f"🛑 ERREUR CRITIQUE : SUPABASE_URL est introuvable.\n(On a cherché le fichier .env exactement ici : {ENV_PATH})"
     )
 
-# --- CONSTANTES DE L'APPLICATION ---
-# On utilise aussi BASE_DIR pour le parquet, comme ça il le trouvera à 100%
-PARQUET_FILE_PATH = os.path.join(BASE_DIR, "data", "horragor_final_data.parquet")
-
-TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+# 4. Parquet enrichi (seule source de vérité)
+PARQUET_FILE_PATH = os.path.join(BASE_DIR, "data", "horragor_enriched.parquet")
 
 # Paramètres d'Intelligence Artificielle
 EMBEDDING_MODEL_NAME = "nomic-embed-text"

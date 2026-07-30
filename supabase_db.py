@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-from src.config import PARQUET_FILE_PATH, SUPABASE_URL, TMDB_API_KEY
+from src.config import PARQUET_FILE_PATH, SUPABASE_URL
 
 Base = declarative_base()
 
@@ -264,13 +264,6 @@ def save_to_supabase(records: list[dict]) -> None:
 # =====================================================================
 if __name__ == "__main__":
     print("🦇 Réveil de l'architecture Supabase...")
-
-    if TMDB_API_KEY:
-        print(f"🎬 Clé TMDB détectée dans .env (****{TMDB_API_KEY[-4:]}).")
-        print("   → Lance 'python enrich_parquet.py --api-key $TMDB_API_KEY' avant")
-        print("     d'exécuter ce script pour bénéficier des colonnes enrichies.")
-    else:
-        print("ℹ️  Pas de TMDB_API_KEY dans .env — ingestion du parquet standard.")
 
     init_db()
 
