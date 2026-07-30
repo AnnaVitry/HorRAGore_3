@@ -1,0 +1,185 @@
+version: "3.9"
+
+# ==============================================================================
+# HorRAGore v3 — Infrastructure complète
+# Lance tout avec : docker compose up -d
+#
+# Services :
+#   - api          : Backend FastAPI + LangGraph (port 8000)
+#   - frontend     : Interface Streamlit (port 8501)
+#   - langfuse     : Observabilité LLM (port 3000)
+#   - langfuse-db  : PostgreSQL dédié à Langfuse
+#   - prometheus   : Collecte de métriques (port 9090)
+#   - grafana      : Dashboards de métriques (port 3001)
+#   - uptime-kuma  : Monitoring de disponibilité (port 3002)
+# ==============================================================================
+
+networks:
+  horragor-net:
+    driver: bridge
+
+volumes:
+  langfuse-db-data:
+  prometheus-data:
+  grafana-data:
+  uptime-kuma-data:
+
+services:
+
+  # ============================================================================
+  # LANGFUSE — Observabilité LLM (traces, tokens, latence)
+  # ============================================================================
+  langfuse-db:
+    image: postgres:15-alpine
+    container_name: horragor-langfuse-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: langfuse
+      POSTGRES_DB: langfuse
+    volumes:
+      - langfuse-db-data:/var/lib/postgresql/data
+    networks:
+      - horragor-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    container_name: horragor-langfuse
+    restart: unless-stopped
+    depends_on:
+      langfuse-db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      NEXTAUTH_SECRET: horragor-secret-change-in-prod
+      NEXTAUTH_URL: http://localhost:3000
+      SALT: horragor-salt-change-in-prod
+      TELEMETRY_ENABLED: "false"
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "false"
+    networks:
+      - horragor-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/public/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # ============================================================================
+  # PROMETHEUS — Collecte de métriques système et applicatives
+  # ============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: horragor-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    networks:
+      - horragor-net
+
+  # ============================================================================
+  # GRAFANA — Dashboards de visualisation des métriques
+  # ============================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: horragor-grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: horragor
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - horragor-net
+
+  # ============================================================================
+  # UPTIME KUMA — Monitoring de disponibilité des services
+  # ============================================================================
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: horragor-uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3002:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+    networks:
+      - horragor-net
+
+  # ============================================================================
+  # API — Backend FastAPI + LangGraph
+  # Note : Ollama doit tourner sur la machine hôte (pas dockerisé —
+  # les modèles GPU nécessitent un accès direct au matériel).
+  # ============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: horragor-api
+    restart: unless-stopped
+    depends_on:
+      langfuse:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Ollama tourne sur l'hôte, pas dans Docker
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      # Langfuse pointe vers le service interne
+      LANGFUSE_HOST: http://langfuse:3000
+    extra_hosts:
+      # Permet à l'API d'atteindre Ollama sur la machine hôte (Linux)
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Monte le parquet enrichi sans le copier dans l'image
+      - ./data:/app/data:ro
+    networks:
+      - horragor-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ============================================================================
+  # FRONTEND — Interface Streamlit
+  # ============================================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: horragor-frontend
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+    environment:
+      API_URL: http://api:8000
+    networks:
+      - horragor-net

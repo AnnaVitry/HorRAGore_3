@@ -1,0 +1,14 @@
+.env
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.ruff_cache
+monitoring/
+data/.enrich_checkpoint.json
+README.md
+claude.md
+example.env
