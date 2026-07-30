@@ -153,10 +153,7 @@ def query_movie_metadata(movie_reference: str) -> str:
             return f"Aucune métadonnée trouvée en base pour '{movie_reference}'."
 
         # --- Présentation HONNÊTE des champs absents ---
-        # budget/revenue sont des BigInteger default=0 : un 0 (ou None) signifie
-        # "donnée absente", pas "budget nul". On l'affiche comme tel pour ne pas
-        # que l'Écrivain (ni le CoT) prenne un 0 pour une vraie valeur.
-        budget_str = f"{media.budget}$" if media.budget else "non renseigné"
+        budget_str = f"{media.budget_tmdb}$" if media.budget_tmdb else "non renseigné"
         date_str = media.release_date if media.release_date else "non renseignée"
 
         score_record = session.query(Score).filter_by(media_id=media.id).first()
@@ -166,9 +163,19 @@ def query_movie_metadata(movie_reference: str) -> str:
             else "non renseignée"
         )
 
+        # --- Colonnes TMDB enrichies (disponibles depuis le patch Supabase) ---
+        director_str = media.director or "non renseigné"
+        cast_str = media.cast_top5 or "non renseigné"
+        genres_str = media.genres or "non renseigné"
+        runtime_str = f"{media.runtime} min" if media.runtime else "non renseignée"
+        tagline_str = media.tagline or "non renseignée"
+
         return (
             f"Titre Exact: {media.title}, Sortie: {date_str}, "
-            f"Univers: {media.category}, Budget: {budget_str}, Note: {note_str}. "
+            f"Univers: {media.category}, Genres: {genres_str}, "
+            f"Réalisateur: {director_str}, Casting: {cast_str}, "
+            f"Durée: {runtime_str}, Accroche: {tagline_str}, "
+            f"Budget: {budget_str}, Note: {note_str}. "
             f"(ID officiel pour info: {media.horragor_id})"
         )
     except SQLAlchemyError as e:
