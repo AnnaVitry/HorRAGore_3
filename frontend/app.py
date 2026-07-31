@@ -6,8 +6,9 @@ import time
 import requests
 import streamlit as st
 
-# URL de l'API FastAPI de ton binôme
-BACKEND_URL = "http://localhost:8000/chat"
+# URL de l'API — utilise API_URL si défini (Docker), sinon localhost (dev local)
+_API_BASE = os.environ.get("API_URL", "http://localhost:8000")
+BACKEND_URL = f"{_API_BASE}/chat"
 
 # --- BANQUE DE PHRASES D'ERREUR ALÉATOIRES (Horreur & SF) ---
 FASTAPI_ERROR_QUOTES = [
@@ -160,7 +161,7 @@ with st.sidebar:
 
     # Indicateur dynamique visuel dans la sidebar
     try:
-        response = requests.get("http://localhost:8000/", timeout=300)
+        response = requests.get(f"{_API_BASE}/", timeout=300)
         st.success("💚 API FastAPI En Ligne")
     except requests.exceptions.RequestException:
         st.error("❤️ API FastAPI Hors-ligne")
