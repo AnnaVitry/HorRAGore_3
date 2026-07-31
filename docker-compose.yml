@@ -137,8 +137,8 @@ services:
     env_file:
       - .env
     environment:
-      # Ollama tourne sur l'hôte, pas dans Docker
-      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      # Ollama tourne sur l'hôte, accessible via l'IP du gateway Docker
+      OLLAMA_BASE_URL: http://172.19.0.1:11434
       # Langfuse pointe vers le service interne
       LANGFUSE_HOST: http://langfuse:3000
     extra_hosts:

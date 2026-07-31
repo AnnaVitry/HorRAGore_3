@@ -24,3 +24,8 @@ PARQUET_FILE_PATH = os.path.join(BASE_DIR, "data", "horragor_enriched.parquet")
 # Paramètres d'Intelligence Artificielle
 EMBEDDING_MODEL_NAME = "nomic-embed-text"
 LLM_MODEL_NAME = "llama3.1"
+
+# URL Ollama — surchargée par docker-compose via OLLAMA_BASE_URL
+# En local : http://localhost:11434 (défaut Ollama)
+# En Docker : http://172.19.0.1:11434 (gateway du réseau horragor-net)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")

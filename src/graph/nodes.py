@@ -11,6 +11,7 @@ from langchain_ollama import ChatOllama
 from langgraph.prebuilt import ToolNode
 from pydantic import BaseModel, Field
 
+from src.config import OLLAMA_BASE_URL
 from src.models.state import AgentState, EvaluationVerdict
 from src.tools.rag_tool import find_similar_horror_movies, query_movie_metadata
 from src.tools.scraper_tool import scrape_detailed_synopsis
@@ -46,9 +47,9 @@ class RagHarvest(BaseModel):
 
 
 # --- 1. INITIALISATION DES MODÈLES LLM ---
-llm_tech = ChatOllama(model="llama3.1", temperature=0.1)
-llm_creative = ChatOllama(model="llama3.1", temperature=0.3)
-llm_judge = ChatOllama(model="llama3.1", temperature=0.0)
+llm_tech = ChatOllama(model="llama3.1", temperature=0.1, base_url=OLLAMA_BASE_URL)
+llm_creative = ChatOllama(model="llama3.1", temperature=0.3, base_url=OLLAMA_BASE_URL)
+llm_judge = ChatOllama(model="llama3.1", temperature=0.0, base_url=OLLAMA_BASE_URL)
 
 # --- 2. L'AGENT RAG (Fouille Locale) ---
 rag_tools = [query_movie_metadata, find_similar_horror_movies]
@@ -127,6 +128,11 @@ def rag_node(state: AgentState) -> dict[str, Any]:
     # (is_database_sufficient + CoT), et les FAITS viennent directement du SQL brut.
     raw_tool_outputs = [str(m.content) for m in messages if isinstance(m, ToolMessage)]
     local_facts = "\n".join(raw_tool_outputs)
+
+    # Debug temporaire : affiche ce qui arrive vraiment à la Narration
+    print(f"🔍 [RAG DEBUG] Types de messages : {[type(m).__name__ for m in messages]}")
+    print(f"🔍 [RAG DEBUG] ToolMessages trouvés : {len(raw_tool_outputs)}")
+    print(f"🔍 [RAG DEBUG] local_facts (200 premiers car.) : {local_facts[:200]!r}")
 
     # Garde-fou anti-hallucination de succès : si les faits bruts sont vides ou
     # négatifs, on refuse la sortie locale même si le LLM s'est déclaré satisfait.

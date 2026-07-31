@@ -15,7 +15,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 # 1. Imports propres depuis notre configuration centralisée (La source de vérité)
-from src.config import EMBEDDING_MODEL_NAME, PARQUET_FILE_PATH, SUPABASE_URL
+from src.config import (
+    EMBEDDING_MODEL_NAME,
+    OLLAMA_BASE_URL,
+    PARQUET_FILE_PATH,
+    SUPABASE_URL,
+)
 
 # 2. Import de tes tables
 from supabase_db import ContentStore, Media, Score
@@ -68,7 +73,9 @@ class FastMovieRouter:
 
     def __init__(self, parquet_path: str = PARQUET_FILE_PATH):
         print("🧠 Initialisation de la mémoire éphémère (Routeur FAISS)...")
-        self.embeddings_model = OllamaEmbeddings(model=EMBEDDING_MODEL_NAME)
+        self.embeddings_model = OllamaEmbeddings(
+            model=EMBEDDING_MODEL_NAME, base_url=OLLAMA_BASE_URL
+        )
         self.dimension = 768
         self.index = faiss.IndexFlatL2(self.dimension)
         self.movie_ids = []
@@ -205,7 +212,9 @@ def find_similar_horror_movies(movie_reference: str) -> str:
 
         conn_string = SUPABASE_URL.replace("postgresql://", "postgresql+psycopg2://")
 
-        embeddings = OllamaEmbeddings(model=EMBEDDING_MODEL_NAME)
+        embeddings = OllamaEmbeddings(
+            model=EMBEDDING_MODEL_NAME, base_url=OLLAMA_BASE_URL
+        )
         vectorstore = PGVector(
             connection_string=conn_string,
             collection_name="horragor_vectors",
