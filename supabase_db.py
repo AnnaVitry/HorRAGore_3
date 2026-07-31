@@ -138,12 +138,16 @@ def _safe_int(val) -> int | None:
         return None
 
 
-def _safe_str(val) -> str | None:
-    """Renvoie None si la valeur est vide, NaN ou nulle."""
+def _safe_str(val, max_len: int | None = None) -> str | None:
+    """Renvoie None si la valeur est vide, NaN ou nulle. Tronque si max_len spécifié."""
     if val is None:
         return None
     s = str(val).strip()
-    return s if s and s.lower() not in ("nan", "none", "") else None
+    if not s or s.lower() in ("nan", "none", ""):
+        return None
+    if max_len and len(s) > max_len:
+        s = s[:max_len]
+    return s
 
 
 def save_to_supabase(records: list[dict]) -> None:
@@ -200,13 +204,13 @@ def save_to_supabase(records: list[dict]) -> None:
                 # Financier original (parquet de base)
                 budget=_safe_int(rec.get("budget")) or 0,
                 revenue=_safe_int(rec.get("revenue")) or 0,
-                # Enrichissement TMDB (None si absent du parquet)
-                director=_safe_str(rec.get("director")),
-                cast_top5=_safe_str(rec.get("cast_top5")),
-                genres=_safe_str(rec.get("genres")),
+                # Enrichissement TMDB (None si absent du parquet, tronqué si trop long)
+                director=_safe_str(rec.get("director"), max_len=500),
+                cast_top5=_safe_str(rec.get("cast_top5"), max_len=1000),
+                genres=_safe_str(rec.get("genres"), max_len=255),
                 runtime=_safe_int(rec.get("runtime")),
                 tagline=_safe_str(rec.get("tagline")),
-                original_language=_safe_str(rec.get("original_language")),
+                original_language=_safe_str(rec.get("original_language"), max_len=10),
                 budget_tmdb=_safe_int(rec.get("budget_tmdb")),
                 revenue_tmdb=_safe_int(rec.get("revenue_tmdb")),
                 tmdb_vote_count=_safe_int(rec.get("tmdb_vote_count")),
