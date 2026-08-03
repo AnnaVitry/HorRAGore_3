@@ -11,7 +11,7 @@
 #   3. docs     : Build la documentation Sphinx
 # ==============================================================================
 
-name: HorRAGore CI/CD
+name: HorRAGore CI
 
 on:
   push:
