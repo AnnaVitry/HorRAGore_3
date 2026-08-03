@@ -1,11 +1,5 @@
 # ==============================================================================
 # HorRAGore v3 — Pipeline CD (Continuous Deployment)
-#
-# Déclenché sur : Push sur main (après merge d'une PR)
-#
-# Jobs :
-#   1. build-push-api      : Build et push l'image API sur Docker Hub
-#   2. build-push-frontend : Build et push l'image Frontend sur Docker Hub
 # ==============================================================================
 
 name: HorRAGore CD
@@ -14,10 +8,10 @@ on:
   push:
     branches: [main]
 
+env:
+  OWNER: annavitry
+
 jobs:
-  # ============================================================================
-  # JOB 1 : Build et Push image API
-  # ============================================================================
   build-push-api:
     name: 🐳 Build & Push API
     runs-on: ubuntu-latest
@@ -48,12 +42,9 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/horragor-api:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/horragor-api:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner | lower }}/horragor-api:latest
-            ghcr.io/${{ github.repository_owner | lower }}/horragor-api:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/horragor-api:latest
+            ghcr.io/${{ env.OWNER }}/horragor-api:${{ github.sha }}
 
-  # ============================================================================
-  # JOB 2 : Build et Push image Frontend
-  # ============================================================================
   build-push-frontend:
     name: 🐳 Build & Push Frontend
     runs-on: ubuntu-latest
@@ -84,5 +75,5 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/horragor-frontend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/horragor-frontend:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner | lower }}/horragor-frontend:latest
-            ghcr.io/${{ github.repository_owner | lower }}/horragor-frontend:${{ github.sha }}
+            ghcr.io/${{ env.OWNER }}/horragor-frontend:latest
+            ghcr.io/${{ env.OWNER }}/horragor-frontend:${{ github.sha }}
