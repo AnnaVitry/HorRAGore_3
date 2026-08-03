@@ -1,27 +1,17 @@
-# Configuration file for the Sphinx documentation builder.
-#
-# For the full list of built-in configuration values, see the documentation:
-# https://www.sphinx-doc.org/en/master/usage/configuration.html
-
 import os
 import sys
 
-# -- Configuration des chemins ------------------------------------------------
-# CORRECTION CRITIQUE : on remonte de 2 dossiers (depuis docs/source/) pour atteindre la racine
-sys.path.insert(0, os.path.abspath("../.."))
+sys.path.insert(0, os.path.abspath(".."))
 
-# Variables d'environnement minimales pour éviter que config.py plante pendant l'inspection
 os.environ.setdefault("SUPABASE_URL", "postgresql://test:test@localhost:5432/test")
 os.environ.setdefault("OLLAMA_BASE_URL", "http://localhost:11434")
 
-# -- Informations sur le projet -----------------------------------------------
 project = "HorRAGore"
 copyright = "2026, Anna Vitry"
 author = "Anna Vitry"
 release = "3.0"
 language = "fr"
 
-# -- Configuration générale ---------------------------------------------------
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.viewcode",
@@ -32,15 +22,18 @@ extensions = [
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-# -- Options pour la sortie HTML ----------------------------------------------
-html_theme = "sphinx_rtd_theme"
+# Thème Furo — moderne, menu latéral, mode sombre/clair
+html_theme = "furo"
+html_static_path = ["_static"]
 
-# Commenté pour éviter une erreur si le dossier n'existe pas encore.
-# Décommente-le si tu crées un dossier docs/source/_static/ pour des logos ou du CSS.
-# html_static_path = ["_static"]
+html_theme_options = {
+    "sidebar_hide_name": False,
+    "navigation_with_keys": True,
+    "top_of_page_button": "edit",
+}
 
-# -- Configuration de Autodoc -------------------------------------------------
-# Permet de forcer l'affichage du code, même pour les fonctions privées
+html_title = "🩸 HorRAGore v3"
+
 autodoc_default_options = {
     "members": True,
     "private-members": True,

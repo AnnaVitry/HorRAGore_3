@@ -117,7 +117,7 @@ jobs:
       - name: Installation des dépendances + Sphinx
         run: |
           uv sync --frozen
-          uv pip install sphinx sphinx-rtd-theme
+          uv pip install sphinx furo
 
       - name: Build Sphinx
         env:
