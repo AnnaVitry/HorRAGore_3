@@ -4,7 +4,6 @@ Le spec exige que le routage soit déterministe et testable unitairement
 sans lancer le pipeline complet. Ces tests vérifient exactement ça.
 """
 
-import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import END
 

@@ -7,8 +7,6 @@ Les tests unitaires ne nécessitent aucune connexion DB, Ollama ou réseau.
 
 import os
 
-import pytest
-
 
 def pytest_configure(config):
     """Injecte les variables d'environnement de test avant la collecte des modules."""

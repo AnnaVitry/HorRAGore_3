@@ -9,7 +9,6 @@ Couvre les 4 fonctions pures exportables :
 Aucune dépendance DB, Ollama ou réseau — 100% unitaire.
 """
 
-import pytest
 
 # Import direct des fonctions pures (pas d'import du module entier
 # pour éviter d'initialiser ChatOllama au niveau module)
