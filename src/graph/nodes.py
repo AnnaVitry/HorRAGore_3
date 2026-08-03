@@ -167,6 +167,7 @@ def scraper_node(state: AgentState) -> dict[str, Any]:
     """Agent Scraper agentique : réclame l'outil Wikipédia au moteur, puis récolte le butin.
 
     Deux passages possibles :
+
     - 1er passage : le LLM émet un tool_call `scrape_detailed_synopsis` (routé vers `tools`).
     - 2e passage : le résultat de l'outil est déjà là -> on le range dans `web_anecdotes`
       (isolation du contexte) et on renvoie un message SANS tool_call pour filer vers la Narration.
