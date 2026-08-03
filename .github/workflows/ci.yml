@@ -92,11 +92,13 @@ jobs:
         run: uv run ruff check src/ tests/
 
   # ============================================================================
-  # JOB 3 : Documentation Sphinx
+  # JOB 3 : Documentation Sphinx + déploiement GitHub Pages
   # ============================================================================
   docs:
     name: 📚 Documentation Sphinx
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout du code
@@ -130,3 +132,10 @@ jobs:
         with:
           name: sphinx-docs
           path: docs/_build/html/
+
+      - name: Déploiement sur GitHub Pages
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/_build/html

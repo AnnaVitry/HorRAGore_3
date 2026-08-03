@@ -1,5 +1,12 @@
 # 🩸 HorRAGore (Projet de Anna)
 
+[![HorRAGore CI](https://github.com/AnnaVitry/HorRAGore_3/actions/workflows/ci.yml/badge.svg)](https://github.com/AnnaVitry/HorRAGore_3/actions/workflows/ci.yml)
+[![HorRAGore CD](https://github.com/AnnaVitry/HorRAGore_3/actions/workflows/cd.yml/badge.svg)](https://github.com/AnnaVitry/HorRAGore_3/actions/workflows/cd.yml)
+[![Docker Hub](https://img.shields.io/badge/Docker%20Hub-annavitry-blue?logo=docker)](https://hub.docker.com/u/annavitry)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-green)](https://annavitry.github.io/HorRAGore_3/)
+[![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ## Résumé
 HorRAGore est un moteur **RAG (Retrieval-Augmented Generation)** unifié et un pipeline ETL, spécialisé dans l'univers de l'horreur (cinéma, littérature, sci-fi).
 
