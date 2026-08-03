@@ -1,0 +1,132 @@
+# ==============================================================================
+# HorRAGore v3 — Pipeline CI/CD GitHub Actions
+#
+# Déclenché sur :
+#   - Push sur main
+#   - Pull Request vers main
+#
+# Jobs :
+#   1. tests    : Lance les 79 tests unitaires (sans DB, Ollama ou réseau)
+#   2. lint     : Vérifie la qualité du code avec Ruff
+#   3. docs     : Build la documentation Sphinx
+# ==============================================================================
+
+name: HorRAGore CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ============================================================================
+  # JOB 1 : Tests unitaires
+  # ============================================================================
+  tests:
+    name: 🧪 Tests unitaires
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installation de uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Installation des dépendances
+        run: uv sync --frozen
+
+      - name: Lancement des tests avec couverture
+        env:
+          SUPABASE_URL: "postgresql://test:test@localhost:5432/test"
+          OLLAMA_BASE_URL: "http://localhost:11434"
+          LANGFUSE_PUBLIC_KEY: "pk-test"
+          LANGFUSE_SECRET_KEY: "sk-test"
+          LANGFUSE_HOST: "http://localhost:3000"
+        run: |
+          uv run pytest tests/ -v --tb=short \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml
+
+      - name: Upload du rapport de couverture
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # ============================================================================
+  # JOB 2 : Lint Ruff
+  # ============================================================================
+  lint:
+    name: 🔍 Lint (Ruff)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installation de uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Installation des dépendances
+        run: uv sync --frozen
+
+      - name: Vérification Ruff
+        run: uv run ruff check src/ tests/
+
+  # ============================================================================
+  # JOB 3 : Documentation Sphinx
+  # ============================================================================
+  docs:
+    name: 📚 Documentation Sphinx
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation de Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installation de uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Installation des dépendances + Sphinx
+        run: |
+          uv sync --frozen
+          uv pip install sphinx sphinx-rtd-theme
+
+      - name: Build Sphinx
+        env:
+          SUPABASE_URL: "postgresql://test:test@localhost:5432/test"
+          OLLAMA_BASE_URL: "http://localhost:11434"
+        run: |
+          cd docs && uv run make html
+
+      - name: Upload de la documentation
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sphinx-docs
+          path: docs/_build/html/
