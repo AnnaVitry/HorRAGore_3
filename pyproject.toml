@@ -27,5 +27,15 @@ dependencies = [
     "wikipedia>=1.4.0",
     "langfuse>=4.14.0",
     "ruff>=0.16.0",
-    "prometheus-client>=0.26.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
