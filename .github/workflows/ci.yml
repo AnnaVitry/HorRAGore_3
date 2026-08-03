@@ -115,9 +115,7 @@ jobs:
           version: "latest"
 
       - name: Installation des dépendances + Sphinx
-        run: |
-          uv sync --frozen
-          uv pip install sphinx furo
+        run: uv sync --frozen
 
       - name: Build Sphinx
         env:
