@@ -124,9 +124,7 @@ services:
   # les modèles GPU nécessitent un accès direct au matériel).
   # ============================================================================
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.api
+    image: annavitry/horragor-api:latest
     container_name: horragor-api
     restart: unless-stopped
     depends_on:
@@ -160,9 +158,7 @@ services:
   # FRONTEND — Interface Streamlit
   # ============================================================================
   frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
+    image: annavitry/horragor-frontend:latest
     container_name: horragor-frontend
     restart: unless-stopped
     depends_on:
