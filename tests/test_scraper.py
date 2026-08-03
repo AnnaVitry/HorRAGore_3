@@ -8,9 +8,7 @@ Les fonctions réseau (_get_with_retry, _get_summary, _get_sections)
 sont testées via mock pour ne pas dépendre de Wikipédia.
 """
 
-from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.tools.scraper_tool import _clean_wikitext, _pick_best_result
 

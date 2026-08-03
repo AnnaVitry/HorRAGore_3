@@ -4,9 +4,7 @@ _resolve_media est testée avec une session SQLAlchemy mockée —
 pas de connexion Supabase réelle nécessaire.
 """
 
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from src.tools.rag_tool import _resolve_media
 
