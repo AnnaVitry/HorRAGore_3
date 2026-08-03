@@ -122,7 +122,7 @@ jobs:
           SUPABASE_URL: "postgresql://test:test@localhost:5432/test"
           OLLAMA_BASE_URL: "http://localhost:11434"
         run: |
-          cd docs && uv run make html
+          uv run sphinx-build -b html docs/ docs/_build/html
 
       - name: Upload de la documentation
         uses: actions/upload-artifact@v4
