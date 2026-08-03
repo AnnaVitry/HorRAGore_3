@@ -1,136 +1,493 @@
+<!doctype html>
+<html class="no-js" lang="fr" data-content_root="./">
+  <head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="genindex.html"><link rel="search" title="Recherche" href="search.html"><link rel="next" title="Schéma de Base de Données" href="database.html"><link rel="prev" title="Architecture Multi-Agent" href="multiagent.html">
+
+    <!-- Generated with Sphinx 9.1.0 and Furo 2025.12.19 -->
+        <title>Backend FastAPI - 🩸 HorRAGore v3</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d111a655" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo.css?v=7bdb33bb" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/furo-extensions.css?v=8dab3a3b" />
+    
+    
 
 
-<!DOCTYPE html>
-<html class="writer-html5" lang="fr" data-content_root="./">
-<head>
-  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Backend FastAPI &mdash; Documentation HorRAGore 3.0</title>
-      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
-      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
-
+<style>
+  body {
+    --color-code-background: #f2f2f2;
+  --color-code-foreground: #1e1e1e;
   
-      <script src="_static/jquery.js?v=5d32c60e"></script>
-      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=99824b11"></script>
-      <script src="_static/doctools.js?v=fd6eb6e6"></script>
-      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
-      <script src="_static/translations.js?v=e6b791cb"></script>
-    <script src="_static/js/theme.js"></script>
-    <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Recherche" href="search.html" />
-    <link rel="next" title="Frontend Streamlit" href="frontend.html" />
-    <link rel="prev" title="HorRAGore v3 — Documentation" href="index.html" /> 
-</head>
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
 
-<body class="wy-body-for-nav"> 
-  <div class="wy-grid-for-nav">
-    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
-      <div class="wy-side-scroll">
-        <div class="wy-side-nav-search" >
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
+    <title>Auto light/dark, in light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
+      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
+      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
+      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
+      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
+      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
+      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
+      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
+      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
+      <circle cx="14.5" cy="9.55" r="3.6"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
+    <title>Auto light/dark, in dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
+      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
+      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
+      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
+      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
+      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
+      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
+      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
+      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
+      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
+      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-pencil" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
+      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
+      <path d="M13.5 6.5l4 4" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+  <symbol id="svg-eye" viewBox="0 0 24 24">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+      <path
+        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
+      <path d="M20 21l2 -2l-2 -2" />
+      <path d="M17 17l-2 2l2 2" />
+    </svg>
+  </symbol>
+</svg>
 
-          
-          
-          <a href="index.html" class="icon icon-home">
-            HorRAGore
-          </a>
-<div role="search">
-  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Rechercher docs" aria-label="Rechercher docs" />
-    <input type="hidden" name="check_keywords" value="yes" />
-    <input type="hidden" name="area" value="default" />
-  </form>
-</div>
-        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contenu</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Backend FastAPI</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#api-fastapi-main-py">API FastAPI (main.py)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#configuration-config-py">Configuration (config.py)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#outils-rag-rag-tool-py">Outils RAG (rag_tool.py)</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#scraper-wikipedia-scraper-tool-py">Scraper Wikipédia (scraper_tool.py)</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="frontend.html">Frontend Streamlit</a></li>
-<li class="toctree-l1"><a class="reference internal" href="database.html">Schéma de Base de Données</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multiagent.html">Architecture Multi-Agent</a></li>
-</ul>
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
+<label class="overlay sidebar-overlay" for="__navigation"></label>
+<label class="overlay toc-overlay" for="__toc"></label>
 
-        </div>
+<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="index.html"><div class="brand">🩸 HorRAGore v3</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
       </div>
-    </nav>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="index.html">
+  
+  <span class="sidebar-brand-text">🩸 HorRAGore v3</span>
+  
+</a><form class="sidebar-search-container" method="get" action="search.html" role="search">
+  <input class="sidebar-search" placeholder="Recherche" name="q" aria-label="Recherche">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">📚 Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="multiagent.html">Architecture Multi-Agent</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Backend FastAPI</a></li>
+<li class="toctree-l1"><a class="reference internal" href="database.html">Schéma de Base de Données</a></li>
+<li class="toctree-l1"><a class="reference internal" href="frontend.html">Frontend Streamlit</a></li>
+</ul>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
-          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="index.html">HorRAGore</a>
-      </nav>
-
-      <div class="wy-nav-content">
-        <div class="rst-content">
-          <div role="navigation" aria-label="Page navigation">
-  <ul class="wy-breadcrumbs">
-      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Backend FastAPI</li>
-      <li class="wy-breadcrumbs-aside">
-            <a href="_sources/backend.rst.txt" rel="nofollow"> Afficher la source de la page</a>
-      </li>
-  </ul>
-  <hr/>
 </div>
-          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
-           <div itemprop="articleBody">
-             
-  <section id="backend-fastapi">
-<h1>Backend FastAPI<a class="headerlink" href="#backend-fastapi" title="Lien vers cette rubrique"></a></h1>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          <div class="view-this-page">
+  <a class="muted-link" href="_sources/backend.rst.txt" title="View this page">
+    <svg><use href="#svg-eye"></use></svg>
+    <span class="visually-hidden">View this page</span>
+  </a>
+</div>
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
+              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
+              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
+          </label>
+        </div>
+        <article role="main" id="furo-main-content">
+          <section id="backend-fastapi">
+<h1>Backend FastAPI<a class="headerlink" href="#backend-fastapi" title="Lien vers cette rubrique">¶</a></h1>
 <p>Point d’entrée de l’API HorRAGore. Expose les routes HTTP,
 le middleware Prometheus et le cycle de vie de l’application.</p>
-<section id="api-fastapi-main-py">
-<h2>API FastAPI (main.py)<a class="headerlink" href="#api-fastapi-main-py" title="Lien vers cette rubrique"></a></h2>
+<section id="module-src.main">
+<span id="api-fastapi-main-py"></span><h2>API FastAPI (main.py)<a class="headerlink" href="#module-src.main" title="Lien vers cette rubrique">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.main.chat_endpoint">
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">src.main.</span></span><span class="sig-name descname"><span class="pre">chat_endpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ChatRequest</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/main.html#chat_endpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.main.chat_endpoint" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Endpoint principal pour dialoguer avec les agents.
+Le routage entre RAG, Scraper et Narration est géré par le graphe compilé.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.main.health_check">
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">src.main.</span></span><span class="sig-name descname"><span class="pre">health_check</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/main.html#health_check"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.main.health_check" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Vérification de survie du système.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.main.lifespan">
+<span class="sig-prename descclassname"><span class="pre">src.main.</span></span><span class="sig-name descname"><span class="pre">lifespan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">app</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">FastAPI</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/main.html#lifespan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.main.lifespan" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Gestionnaire de cycle de vie de l’API.
+S’exécute au démarrage du serveur.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.main.metrics">
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">src.main.</span></span><span class="sig-name descname"><span class="pre">metrics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/main.html#metrics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.main.metrics" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Endpoint Prometheus — exposé sur /metrics, scrapé toutes les 15s.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.main.prometheus_middleware">
+<span class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">src.main.</span></span><span class="sig-name descname"><span class="pre">prometheus_middleware</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">request</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Request</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">call_next</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/main.html#prometheus_middleware"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.main.prometheus_middleware" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Mesure la latence et compte chaque requête HTTP pour Prometheus.</p>
+</dd></dl>
+
 </section>
-<section id="configuration-config-py">
-<h2>Configuration (config.py)<a class="headerlink" href="#configuration-config-py" title="Lien vers cette rubrique"></a></h2>
+<section id="module-src.config">
+<span id="configuration-config-py"></span><h2>Configuration (config.py)<a class="headerlink" href="#module-src.config" title="Lien vers cette rubrique">¶</a></h2>
 </section>
 <section id="outils-rag-rag-tool-py">
-<h2>Outils RAG (rag_tool.py)<a class="headerlink" href="#outils-rag-rag-tool-py" title="Lien vers cette rubrique"></a></h2>
+<h2>Outils RAG (rag_tool.py)<a class="headerlink" href="#outils-rag-rag-tool-py" title="Lien vers cette rubrique">¶</a></h2>
 <p>Résolution de films, recherche SQL et vectorielle PGVector.
 Inclut <code class="docutils literal notranslate"><span class="pre">_resolve_media</span></code> — le cœur déterministe du pipeline.</p>
+<dl class="py class" id="module-src.tools.rag_tool">
+<dt class="sig sig-object py" id="src.tools.rag_tool.FastMovieRouter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">src.tools.rag_tool.</span></span><span class="sig-name descname"><span class="pre">FastMovieRouter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parquet_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'/home/runner/work/HorRAGore_3/HorRAGore_3/data/horragor_enriched.parquet'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/tools/rag_tool.html#FastMovieRouter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.rag_tool.FastMovieRouter" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Bases : <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Routeur vectoriel local pour valider l’existence d’un film.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="src.tools.rag_tool.FastMovieRouter._load_and_index">
+<span class="sig-name descname"><span class="pre">_load_and_index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parquet_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/tools/rag_tool.html#FastMovieRouter._load_and_index"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.rag_tool.FastMovieRouter._load_and_index" title="Lien vers cette définition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="src.tools.rag_tool.FastMovieRouter.get_movie_id">
+<span class="sig-name descname"><span class="pre">get_movie_id</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/src/tools/rag_tool.html#FastMovieRouter.get_movie_id"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.rag_tool.FastMovieRouter.get_movie_id" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Convertit une requête textuelle en identifiant de film via similarité vectorielle (FAISS).</p>
+<p>Processus analytique :
+1. Vectorisation de la requête utilisateur (coordonnée spatiale).
+2. Recherche du plus proche voisin (Top 1) via la distance L2.
+3. Validation de la pertinence via un seuil de distance statique.</p>
+<p>⚠️ Avertissement d’architecture : Le seuil statique (0.5) est arbitraire et
+dépend fortement du modèle d’embedding utilisé. Il risque de générer des faux
+négatifs si la dispersion du modèle “nomic” est large.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Paramètres<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>query</strong> (<em>str</em>) – L’intention ou la recherche textuelle brute.</p>
+</dd>
+<dt class="field-even">Renvoie<span class="colon">:</span></dt>
+<dd class="field-even"><p>L’identifiant (horragor_id) si la distance &lt; 0.5, sinon None.</p>
+</dd>
+<dt class="field-odd">Type renvoyé<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str | None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.tools.rag_tool._resolve_media">
+<span class="sig-prename descclassname"><span class="pre">src.tools.rag_tool.</span></span><span class="sig-name descname"><span class="pre">_resolve_media</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">session</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/src/tools/rag_tool.html#_resolve_media"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.rag_tool._resolve_media" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Résout une référence (ID ou titre approximatif) vers UN film précis.</p>
+<dl class="simple">
+<dt>Stratégie déterministe, dans cet ordre :</dt><dd><ol class="arabic simple">
+<li><p>Match EXACT par horragor_id ou par titre (insensible à la casse).</p></li>
+<li><p>À défaut, le PLUS COURT titre contenant la référence.
+Ainsi “Alien” l’emporte sur “Alienation”, “Alien Nation”, etc.</p></li>
+</ol>
+</dd>
+</dl>
+<p>Remplace l’ancien <cite>or_(…).ilike(« %ref% »).first()</cite> qui, sans tri, attrapait
+le premier film physique venu (d’où “Alienation” au lieu du vrai “Alien”).</p>
+</dd></dl>
+
 </section>
 <section id="scraper-wikipedia-scraper-tool-py">
-<h2>Scraper Wikipédia (scraper_tool.py)<a class="headerlink" href="#scraper-wikipedia-scraper-tool-py" title="Lien vers cette rubrique"></a></h2>
+<h2>Scraper Wikipédia (scraper_tool.py)<a class="headerlink" href="#scraper-wikipedia-scraper-tool-py" title="Lien vers cette rubrique">¶</a></h2>
 <p>Fallback web via API REST Wikipédia directe (sans lib wikipedia).</p>
+<p id="module-src.tools.scraper_tool">Scraper Wikipédia — API REST directe, sans la lib <cite>wikipedia</cite>.</p>
+<dl class="simple">
+<dt>Pourquoi remplacer la lib <cite>wikipedia</cite> ?</dt><dd><ul class="simple">
+<li><p>Elle fait des appels MediaWiki avec un User-Agent générique souvent rate-limité.</p></li>
+<li><p>Sa gestion des erreurs réseau est opaque (JSONDecodeError silencieux).</p></li>
+<li><p>Elle ne permet pas de configurer timeout, headers, ni retry backoff.</p></li>
+</ul>
+</dd>
+<dt>On appelle directement deux endpoints officiels de Wikipédia :</dt><dd><ol class="arabic simple">
+<li><p>REST /page/summary/{title}  → intro structurée (titre, extrait, URL).</p></li>
+<li><p>Action API ?action=query… → sections de production/casting en wikitext brut,
+nettoyé avec une regex simple pour retirer les balises wiki.</p></li>
+</ol>
+</dd>
+</dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="src.tools.scraper_tool._clean_wikitext">
+<span class="sig-prename descclassname"><span class="pre">src.tools.scraper_tool.</span></span><span class="sig-name descname"><span class="pre">_clean_wikitext</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/src/tools/scraper_tool.html#_clean_wikitext"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.scraper_tool._clean_wikitext" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Supprime les balises wikitext les plus courantes, garde le texte lisible.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.tools.scraper_tool._get_sections">
+<span class="sig-prename descclassname"><span class="pre">src.tools.scraper_tool.</span></span><span class="sig-name descname"><span class="pre">_get_sections</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/src/tools/scraper_tool.html#_get_sections"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.scraper_tool._get_sections" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Récupère les sections de production en wikitext, nettoyées.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.tools.scraper_tool._get_summary">
+<span class="sig-prename descclassname"><span class="pre">src.tools.scraper_tool.</span></span><span class="sig-name descname"><span class="pre">_get_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/src/tools/scraper_tool.html#_get_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.scraper_tool._get_summary" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Récupère l’intro structurée via l’API REST (plus fiable que wikitext).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.tools.scraper_tool._get_with_retry">
+<span class="sig-prename descclassname"><span class="pre">src.tools.scraper_tool.</span></span><span class="sig-name descname"><span class="pre">_get_with_retry</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Response</span></span></span><a class="reference internal" href="_modules/src/tools/scraper_tool.html#_get_with_retry"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.scraper_tool._get_with_retry" title="Lien vers cette définition">¶</a></dt>
+<dd><p>GET avec retry exponentiel sur erreur réseau transitoire.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.tools.scraper_tool._pick_best_result">
+<span class="sig-prename descclassname"><span class="pre">src.tools.scraper_tool.</span></span><span class="sig-name descname"><span class="pre">_pick_best_result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">results</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">movie_title</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="_modules/src/tools/scraper_tool.html#_pick_best_result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.scraper_tool._pick_best_result" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Sélection déterministe : exact &gt; (film &gt; fallback results[0].</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="src.tools.scraper_tool._search_titles">
+<span class="sig-prename descclassname"><span class="pre">src.tools.scraper_tool.</span></span><span class="sig-name descname"><span class="pre">_search_titles</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">query</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/src/tools/scraper_tool.html#_search_titles"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.tools.scraper_tool._search_titles" title="Lien vers cette définition">¶</a></dt>
+<dd><p>Recherche de titres via l’Action API (opensearch).</p>
+</dd></dl>
+
 </section>
 </section>
 
-
-           </div>
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="database.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Schéma de Base de Données</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="multiagent.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Architecture Multi-Agent</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; 2026, Anna Vitry
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
           </div>
-          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Pied de page">
-        <a href="index.html" class="btn btn-neutral float-left" title="HorRAGore v3 — Documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Précédent</a>
-        <a href="frontend.html" class="btn btn-neutral float-right" title="Frontend Streamlit" accesskey="n" rel="next">Suivant <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
     </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Backend FastAPI</a><ul>
+<li><a class="reference internal" href="#module-src.main">API FastAPI (main.py)</a><ul>
+<li><a class="reference internal" href="#src.main.chat_endpoint"><code class="docutils literal notranslate"><span class="pre">chat_endpoint()</span></code></a></li>
+<li><a class="reference internal" href="#src.main.health_check"><code class="docutils literal notranslate"><span class="pre">health_check()</span></code></a></li>
+<li><a class="reference internal" href="#src.main.lifespan"><code class="docutils literal notranslate"><span class="pre">lifespan()</span></code></a></li>
+<li><a class="reference internal" href="#src.main.metrics"><code class="docutils literal notranslate"><span class="pre">metrics()</span></code></a></li>
+<li><a class="reference internal" href="#src.main.prometheus_middleware"><code class="docutils literal notranslate"><span class="pre">prometheus_middleware()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#module-src.config">Configuration (config.py)</a></li>
+<li><a class="reference internal" href="#outils-rag-rag-tool-py">Outils RAG (rag_tool.py)</a><ul>
+<li><a class="reference internal" href="#src.tools.rag_tool.FastMovieRouter"><code class="docutils literal notranslate"><span class="pre">FastMovieRouter</span></code></a><ul>
+<li><a class="reference internal" href="#src.tools.rag_tool.FastMovieRouter._load_and_index"><code class="docutils literal notranslate"><span class="pre">FastMovieRouter._load_and_index()</span></code></a></li>
+<li><a class="reference internal" href="#src.tools.rag_tool.FastMovieRouter.get_movie_id"><code class="docutils literal notranslate"><span class="pre">FastMovieRouter.get_movie_id()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#src.tools.rag_tool._resolve_media"><code class="docutils literal notranslate"><span class="pre">_resolve_media()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#scraper-wikipedia-scraper-tool-py">Scraper Wikipédia (scraper_tool.py)</a><ul>
+<li><a class="reference internal" href="#src.tools.scraper_tool._clean_wikitext"><code class="docutils literal notranslate"><span class="pre">_clean_wikitext()</span></code></a></li>
+<li><a class="reference internal" href="#src.tools.scraper_tool._get_sections"><code class="docutils literal notranslate"><span class="pre">_get_sections()</span></code></a></li>
+<li><a class="reference internal" href="#src.tools.scraper_tool._get_summary"><code class="docutils literal notranslate"><span class="pre">_get_summary()</span></code></a></li>
+<li><a class="reference internal" href="#src.tools.scraper_tool._get_with_retry"><code class="docutils literal notranslate"><span class="pre">_get_with_retry()</span></code></a></li>
+<li><a class="reference internal" href="#src.tools.scraper_tool._pick_best_result"><code class="docutils literal notranslate"><span class="pre">_pick_best_result()</span></code></a></li>
+<li><a class="reference internal" href="#src.tools.scraper_tool._search_titles"><code class="docutils literal notranslate"><span class="pre">_search_titles()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
 
-  <hr/>
-
-  <div role="contentinfo">
-    <p>&#169; Droits d'auteur 2026, Anna Vitry.</p>
-  </div>
-
-  Compilé avec <a href="https://www.sphinx-doc.org/">Sphinx</a> en utilisant un
-    <a href="https://github.com/readthedocs/sphinx_rtd_theme">thème</a>
-    fourni par <a href="https://readthedocs.org">Read the Docs</a>.
-   
-
-</footer>
+          </div>
         </div>
       </div>
-    </section>
+      
+      
+    </aside>
   </div>
-  <script>
-      jQuery(function () {
-          SphinxRtdTheme.Navigation.enable(true);
-      });
-  </script> 
-
-</body>
+</div><script src="_static/documentation_options.js?v=9b9fe73a"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/furo.js?v=46bd48cc"></script>
+    <script src="_static/translations.js?v=e6b791cb"></script>
+    </body>
 </html>
