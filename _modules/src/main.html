@@ -228,10 +228,12 @@
         </div>
         <article role="main" id="furo-main-content">
           <h1>Code source de src.main</h1><div class="highlight"><pre>
-<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">asynccontextmanager</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">FastAPI</span><span class="p">,</span> <span class="n">HTTPException</span><span class="p">,</span> <span class="n">Request</span><span class="p">,</span> <span class="n">Response</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fastapi</span><span class="w"> </span><span class="kn">import</span> <span class="n">Depends</span><span class="p">,</span> <span class="n">FastAPI</span><span class="p">,</span> <span class="n">HTTPException</span><span class="p">,</span> <span class="n">Request</span><span class="p">,</span> <span class="n">Response</span><span class="p">,</span> <span class="n">Security</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fastapi.security</span><span class="w"> </span><span class="kn">import</span> <span class="n">APIKeyHeader</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">langchain_core.messages</span><span class="w"> </span><span class="kn">import</span> <span class="n">AIMessage</span><span class="p">,</span> <span class="n">HumanMessage</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">langfuse.langchain</span><span class="w"> </span><span class="kn">import</span> <span class="n">CallbackHandler</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">prometheus_client</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
@@ -250,6 +252,36 @@
 <span class="c1"># Connexion DB pour le check de santé</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">src.tools.rag_tool</span><span class="w"> </span><span class="kn">import</span> <span class="n">SessionLocal</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">supabase_db</span><span class="w"> </span><span class="kn">import</span> <span class="n">Media</span>
+
+<span class="c1"># ==============================================================================</span>
+<span class="c1"># SÉCURITÉ — API Key inter-services</span>
+<span class="c1"># La clé est définie dans .env (API_SECRET_KEY).</span>
+<span class="c1"># Le Frontend l&#39;envoie dans le header X-API-Key à chaque requête /chat.</span>
+<span class="c1"># /metrics et / restent publics (Prometheus + health check).</span>
+<span class="c1"># ==============================================================================</span>
+
+<span class="n">API_KEY_HEADER</span> <span class="o">=</span> <span class="n">APIKeyHeader</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;X-API-Key&quot;</span><span class="p">,</span> <span class="n">auto_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">_API_SECRET_KEY</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;API_SECRET_KEY&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="verify_api_key">
+<a class="viewcode-back" href="../../backend.html#src.main.verify_api_key">[docs]</a>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">verify_api_key</span><span class="p">(</span><span class="n">api_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">Security</span><span class="p">(</span><span class="n">API_KEY_HEADER</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Vérifie la clé API inter-services.</span>
+
+<span class="sd">    Lève HTTP 401 si absente, HTTP 403 si invalide.</span>
+<span class="sd">    Désactivée si API_SECRET_KEY n&#39;est pas définie (dev local sans clé).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_API_SECRET_KEY</span><span class="p">:</span>
+        <span class="c1"># Mode dev local : pas de clé configurée → accès libre</span>
+        <span class="k">return</span> <span class="s2">&quot;dev-mode&quot;</span>
+    <span class="k">if</span> <span class="n">api_key</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">HTTPException</span><span class="p">(</span><span class="n">status_code</span><span class="o">=</span><span class="mi">401</span><span class="p">,</span> <span class="n">detail</span><span class="o">=</span><span class="s2">&quot;X-API-Key manquant.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">api_key</span> <span class="o">!=</span> <span class="n">_API_SECRET_KEY</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">HTTPException</span><span class="p">(</span><span class="n">status_code</span><span class="o">=</span><span class="mi">403</span><span class="p">,</span> <span class="n">detail</span><span class="o">=</span><span class="s2">&quot;Clé API invalide.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">api_key</span></div>
+
+
 
 <span class="c1"># ==============================================================================</span>
 <span class="c1"># MÉTRIQUES PROMETHEUS</span>
@@ -366,7 +398,10 @@
 <div class="viewcode-block" id="chat_endpoint">
 <a class="viewcode-back" href="../../backend.html#src.main.chat_endpoint">[docs]</a>
 <span class="nd">@app</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;/chat&quot;</span><span class="p">,</span> <span class="n">response_model</span><span class="o">=</span><span class="n">ChatResponse</span><span class="p">)</span>
-<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">chat_endpoint</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">ChatRequest</span><span class="p">):</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">chat_endpoint</span><span class="p">(</span>
+    <span class="n">request</span><span class="p">:</span> <span class="n">ChatRequest</span><span class="p">,</span>
+    <span class="n">_</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Depends</span><span class="p">(</span><span class="n">verify_api_key</span><span class="p">),</span>
+<span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Endpoint principal pour dialoguer avec les agents.</span>
 <span class="sd">    Le routage entre RAG, Scraper et Narration est géré par le graphe compilé.</span>

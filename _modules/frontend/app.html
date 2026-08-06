@@ -240,6 +240,10 @@
 <span class="n">_API_BASE</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;API_URL&quot;</span><span class="p">,</span> <span class="s2">&quot;http://localhost:8000&quot;</span><span class="p">)</span>
 <span class="n">BACKEND_URL</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">_API_BASE</span><span class="si">}</span><span class="s2">/chat&quot;</span>
 
+<span class="c1"># Clé API inter-services — injectée par docker-compose ou .env</span>
+<span class="n">_API_SECRET_KEY</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;API_SECRET_KEY&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+<span class="n">_API_HEADERS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;X-API-Key&quot;</span><span class="p">:</span> <span class="n">_API_SECRET_KEY</span><span class="p">}</span> <span class="k">if</span> <span class="n">_API_SECRET_KEY</span> <span class="k">else</span> <span class="p">{}</span>
+
 <span class="c1"># --- BANQUE DE PHRASES D&#39;ERREUR ALÉATOIRES (Horreur &amp; SF) ---</span>
 <span class="n">FASTAPI_ERROR_QUOTES</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;👹 Le signal radio du Nostromo est coupé... L&#39;entité a sectionné les câbles du serveur.&quot;</span><span class="p">,</span>
@@ -474,7 +478,9 @@
         <span class="c1"># Étape B : Appel réel vers l&#39;API FastAPI de ton binôme</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;user_id&quot;</span><span class="p">:</span> <span class="s2">&quot;stream_user_1&quot;</span><span class="p">,</span> <span class="s2">&quot;question&quot;</span><span class="p">:</span> <span class="n">last_user_message</span><span class="p">}</span>
-            <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="n">BACKEND_URL</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
+                <span class="n">BACKEND_URL</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">_API_HEADERS</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">300</span>
+            <span class="p">)</span>
 
             <span class="n">progress_bar</span><span class="o">.</span><span class="n">progress</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
             <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mf">0.2</span><span class="p">)</span>
