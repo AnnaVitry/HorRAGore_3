@@ -129,11 +129,6 @@ def rag_node(state: AgentState) -> dict[str, Any]:
     raw_tool_outputs = [str(m.content) for m in messages if isinstance(m, ToolMessage)]
     local_facts = "\n".join(raw_tool_outputs)
 
-    # Debug temporaire : affiche ce qui arrive vraiment à la Narration
-    print(f"🔍 [RAG DEBUG] Types de messages : {[type(m).__name__ for m in messages]}")
-    print(f"🔍 [RAG DEBUG] ToolMessages trouvés : {len(raw_tool_outputs)}")
-    print(f"🔍 [RAG DEBUG] local_facts (200 premiers car.) : {local_facts[:200]!r}")
-
     # Garde-fou anti-hallucination de succès : si les faits bruts sont vides ou
     # négatifs, on refuse la sortie locale même si le LLM s'est déclaré satisfait.
     if final_decision is True and _lore_looks_empty(local_facts):
@@ -167,7 +162,6 @@ def scraper_node(state: AgentState) -> dict[str, Any]:
     """Agent Scraper agentique : réclame l'outil Wikipédia au moteur, puis récolte le butin.
 
     Deux passages possibles :
-
     - 1er passage : le LLM émet un tool_call `scrape_detailed_synopsis` (routé vers `tools`).
     - 2e passage : le résultat de l'outil est déjà là -> on le range dans `web_anecdotes`
       (isolation du contexte) et on renvoie un message SANS tool_call pour filer vers la Narration.
@@ -182,9 +176,6 @@ def scraper_node(state: AgentState) -> dict[str, Any]:
     ):
         web_result = last.content
         print(f"🕸️ [SCRAPER] Butin web récolté ({len(str(web_result))} car.).")
-        print(
-            f"📄 [SCRAPER] Contenu brut (500 premiers car.) :\n{str(web_result)[:500]}\n"
-        )
         transition = AIMessage(
             content="Enquête web terminée. Dossier transmis à la plume de la Narration."
         )
