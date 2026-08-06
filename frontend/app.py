@@ -10,6 +10,10 @@ import streamlit as st
 _API_BASE = os.environ.get("API_URL", "http://localhost:8000")
 BACKEND_URL = f"{_API_BASE}/chat"
 
+# Clé API inter-services — injectée par docker-compose ou .env
+_API_SECRET_KEY = os.environ.get("API_SECRET_KEY", "")
+_API_HEADERS = {"X-API-Key": _API_SECRET_KEY} if _API_SECRET_KEY else {}
+
 # --- BANQUE DE PHRASES D'ERREUR ALÉATOIRES (Horreur & SF) ---
 FASTAPI_ERROR_QUOTES = [
     "👹 Le signal radio du Nostromo est coupé... L'entité a sectionné les câbles du serveur.",
@@ -235,7 +239,9 @@ if st.session_state.processing and st.session_state.messages:
         # Étape B : Appel réel vers l'API FastAPI de ton binôme
         try:
             payload = {"user_id": "stream_user_1", "question": last_user_message}
-            response = requests.post(BACKEND_URL, json=payload, timeout=300)
+            response = requests.post(
+                BACKEND_URL, json=payload, headers=_API_HEADERS, timeout=300
+            )
 
             progress_bar.progress(100)
             time.sleep(0.2)

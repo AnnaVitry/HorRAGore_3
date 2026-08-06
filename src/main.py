@@ -1,7 +1,9 @@
+import os
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, Security
+from fastapi.security import APIKeyHeader
 from langchain_core.messages import AIMessage, HumanMessage
 from langfuse.langchain import CallbackHandler
 from prometheus_client import (
@@ -20,6 +22,33 @@ from src.models.chat_models import ChatRequest, ChatResponse
 # Connexion DB pour le check de santé
 from src.tools.rag_tool import SessionLocal
 from supabase_db import Media
+
+# ==============================================================================
+# SÉCURITÉ — API Key inter-services
+# La clé est définie dans .env (API_SECRET_KEY).
+# Le Frontend l'envoie dans le header X-API-Key à chaque requête /chat.
+# /metrics et / restent publics (Prometheus + health check).
+# ==============================================================================
+
+API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+_API_SECRET_KEY = os.getenv("API_SECRET_KEY", "")
+
+
+async def verify_api_key(api_key: str | None = Security(API_KEY_HEADER)) -> str:
+    """Vérifie la clé API inter-services.
+
+    Lève HTTP 401 si absente, HTTP 403 si invalide.
+    Désactivée si API_SECRET_KEY n'est pas définie (dev local sans clé).
+    """
+    if not _API_SECRET_KEY:
+        # Mode dev local : pas de clé configurée → accès libre
+        return "dev-mode"
+    if api_key is None:
+        raise HTTPException(status_code=401, detail="X-API-Key manquant.")
+    if api_key != _API_SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Clé API invalide.")
+    return api_key
+
 
 # ==============================================================================
 # MÉTRIQUES PROMETHEUS
@@ -122,7 +151,10 @@ langfuse_handler = CallbackHandler()
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(request: ChatRequest):
+async def chat_endpoint(
+    request: ChatRequest,
+    _: str = Depends(verify_api_key),
+):
     """
     Endpoint principal pour dialoguer avec les agents.
     Le routage entre RAG, Scraper et Narration est géré par le graphe compilé.
