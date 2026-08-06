@@ -138,6 +138,10 @@ LANGFUSE_PUBLIC_KEY="pk-lf-..."
 LANGFUSE_SECRET_KEY="sk-lf-..."
 LANGFUSE_HOST="http://localhost:3000"   # dev local
 # En Docker, LANGFUSE_HOST est surchargé automatiquement par docker-compose.yml
+
+# Clé API inter-services Frontend → API (génère avec : python3 -c "import secrets; print(secrets.token_urlsafe(32))")
+# Laisser vide pour désactiver (mode dev local)
+API_SECRET_KEY=""
 ```
 
 > ⚠️ Ne commite **jamais** le `.env`.
@@ -201,6 +205,26 @@ Métriques exposées sur `/metrics` (scrapées par Prometheus toutes les 15s) :
 | `horragor_chat_success_total` | Counter | Réponses chat réussies |
 
 Dashboard Grafana auto-provisionné : **HorRAGore — Observabilité Multi-Agent**.
+
+---
+
+## 🔒 Sécurité Inter-Services
+
+L'endpoint `/chat` est protégé par une clé API partagée entre le Frontend et l'API.
+
+| Header | Valeur | Obligatoire |
+|---|---|---|
+| `X-API-Key` | Valeur de `API_SECRET_KEY` | Si `API_SECRET_KEY` est définie |
+
+**Génère ta clé :**
+```bash
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+**Comportement :**
+- `API_SECRET_KEY` vide → accès libre (mode dev local)
+- `API_SECRET_KEY` définie → `401` sans clé, `403` si clé invalide
+- `/` (health check) et `/metrics` (Prometheus) restent publics
 
 ---
 
