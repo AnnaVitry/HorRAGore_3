@@ -367,11 +367,6 @@
     <span class="n">raw_tool_outputs</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">content</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">messages</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">ToolMessage</span><span class="p">)]</span>
     <span class="n">local_facts</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">raw_tool_outputs</span><span class="p">)</span>
 
-    <span class="c1"># Debug temporaire : affiche ce qui arrive vraiment à la Narration</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🔍 [RAG DEBUG] Types de messages : </span><span class="si">{</span><span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">m</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">m</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">messages</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🔍 [RAG DEBUG] ToolMessages trouvés : </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">raw_tool_outputs</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🔍 [RAG DEBUG] local_facts (200 premiers car.) : </span><span class="si">{</span><span class="n">local_facts</span><span class="p">[:</span><span class="mi">200</span><span class="p">]</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
-
     <span class="c1"># Garde-fou anti-hallucination de succès : si les faits bruts sont vides ou</span>
     <span class="c1"># négatifs, on refuse la sortie locale même si le LLM s&#39;est déclaré satisfait.</span>
     <span class="k">if</span> <span class="n">final_decision</span> <span class="ow">is</span> <span class="kc">True</span> <span class="ow">and</span> <span class="n">_lore_looks_empty</span><span class="p">(</span><span class="n">local_facts</span><span class="p">):</span>
@@ -411,7 +406,6 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Agent Scraper agentique : réclame l&#39;outil Wikipédia au moteur, puis récolte le butin.</span>
 
 <span class="sd">    Deux passages possibles :</span>
-
 <span class="sd">    - 1er passage : le LLM émet un tool_call `scrape_detailed_synopsis` (routé vers `tools`).</span>
 <span class="sd">    - 2e passage : le résultat de l&#39;outil est déjà là -&gt; on le range dans `web_anecdotes`</span>
 <span class="sd">      (isolation du contexte) et on renvoie un message SANS tool_call pour filer vers la Narration.</span>
@@ -426,9 +420,6 @@
     <span class="p">):</span>
         <span class="n">web_result</span> <span class="o">=</span> <span class="n">last</span><span class="o">.</span><span class="n">content</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;🕸️ [SCRAPER] Butin web récolté (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">web_result</span><span class="p">))</span><span class="si">}</span><span class="s2"> car.).&quot;</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;📄 [SCRAPER] Contenu brut (500 premiers car.) :</span><span class="se">\n</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">web_result</span><span class="p">)[:</span><span class="mi">500</span><span class="p">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
-        <span class="p">)</span>
         <span class="n">transition</span> <span class="o">=</span> <span class="n">AIMessage</span><span class="p">(</span>
             <span class="n">content</span><span class="o">=</span><span class="s2">&quot;Enquête web terminée. Dossier transmis à la plume de la Narration.&quot;</span>
         <span class="p">)</span>

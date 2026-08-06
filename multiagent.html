@@ -355,12 +355,12 @@ texte contre les données sources (SQL + Web) et rejette toute année/fait inven
 <dt class="sig sig-object py" id="src.graph.nodes.scraper_node">
 <span class="sig-prename descclassname"><span class="pre">src.graph.nodes.</span></span><span class="sig-name descname"><span class="pre">scraper_node</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#src.models.state.AgentState" title="src.models.state.AgentState"><span class="pre">AgentState</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/src/graph/nodes.html#scraper_node"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#src.graph.nodes.scraper_node" title="Lien vers cette définition">¶</a></dt>
 <dd><p>Agent Scraper agentique : réclame l’outil Wikipédia au moteur, puis récolte le butin.</p>
-<p>Deux passages possibles :</p>
-<ul class="simple">
-<li><p>1er passage : le LLM émet un tool_call <cite>scrape_detailed_synopsis</cite> (routé vers <cite>tools</cite>).</p></li>
-<li><p>2e passage : le résultat de l’outil est déjà là -&gt; on le range dans <cite>web_anecdotes</cite>
-(isolation du contexte) et on renvoie un message SANS tool_call pour filer vers la Narration.</p></li>
-</ul>
+<p>Deux passages possibles :
+- 1er passage : le LLM émet un tool_call <cite>scrape_detailed_synopsis</cite> (routé vers <cite>tools</cite>).
+- 2e passage : le résultat de l’outil est déjà là -&gt; on le range dans <cite>web_anecdotes</cite></p>
+<blockquote>
+<div><p>(isolation du contexte) et on renvoie un message SANS tool_call pour filer vers la Narration.</p>
+</div></blockquote>
 </dd></dl>
 
 </section>
