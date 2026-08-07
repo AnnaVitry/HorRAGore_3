@@ -72,6 +72,7 @@ Architecture **peer-to-peer** sous LangGraph, RAG local + scraper Wikipédia,
      - ``nomic-embed-text`` via Ollama
    * - Base de données
      - Supabase (PostgreSQL + pgvector)
+   * - Cache vectoriel
      - FAISS (cache vectoriel local)
    * - Orchestration
      - LangGraph + LangChain
