@@ -28,10 +28,10 @@ Projet de formation (DEV IA, Antony Schutz).
 
 ---
 
-## État actuel
+## État actuel — PROJET COMPLET ✅
 
-### ✅ Complété
-- Pipeline complet fonctionnel (RAG → Scraper → Narration → Juge)
+### ✅ Tout est validé
+- Pipeline Multi-Agent fonctionnel (RAG → Scraper → Narration → Juge)
 - `_resolve_media` : résolution déterministe du bon film
 - `query_movie_metadata` expose director, cast_top5, genres, runtime, tagline
 - Scraper API REST Wikipédia (sans lib wikipedia)
@@ -46,20 +46,16 @@ Projet de formation (DEV IA, Antony Schutz).
 - Release v3.0.0
 - Pull Shark x5 🦈
 - Wiki GitHub (5 pages)
-- `start.sh` script de démarrage
-- Liens services dans la sidebar Streamlit
 - Sécurité API Key inter-services (`X-API-Key`)
+- **Test Docker Hub from scratch ✅**
+- **Test GHCR ✅**
+- **Test from scratch (volumes vides) ✅**
+- **Zéro hallucination validé ✅**
 
-### ⚠️ Bug connu à régler en priorité
-- **HTTP 401 sur /chat** : les images Docker Hub/GHCR sont l'ancienne version
-  sans `_API_HEADERS` dans `frontend/app.py`. Le CD doit rebuilder les images
-  après le dernier commit (feat/security). Relancer le CD ou faire un push
-  vide sur main pour déclencher le rebuild.
-
-### ⬜ Reste à faire
-- **Attendre rebuild CD** puis retester Docker Hub + GHCR
-- **Test GHCR** : modifier docker-compose.yml → `ghcr.io/annavitry/horragor-*`
-- **Test from scratch** : `docker compose down -v && docker compose up -d`
+### ⬜ Optionnel / Améliorations futures
+- `start.sh` + liens sidebar Streamlit (fichiers prêts, pas encore commités)
+- Tests d'intégration avec Ollama + Supabase réels
+- Cache réponses scraper
 
 ---
 
@@ -109,19 +105,17 @@ Frontend envoie `_API_HEADERS = {"X-API-Key": _API_SECRET_KEY}`.
 | `src/graph/router.py` | Coupe-circuit scraper-only, aiguillage |
 | `src/main.py` | FastAPI + Prometheus + `verify_api_key` |
 | `supabase_db.py` | ETL avec colonnes TMDB |
-| `docker-compose.yml` | 7 services, images Docker Hub, OLLAMA_BASE_URL, API_SECRET_KEY |
+| `docker-compose.yml` | 7 services, Docker Hub, OLLAMA_BASE_URL, API_SECRET_KEY |
 | `.github/workflows/ci.yml` | Tests + lint + Sphinx + GitHub Pages (Furo) |
 | `.github/workflows/cd.yml` | Build + push Docker Hub + GHCR |
-| `start.sh` | Script démarrage : docker compose + ouverture navigateur |
 | `docs/conf.py` | Sphinx config, thème Furo |
 | `tests/` | 79 tests unitaires |
 
 ---
 
-## Prochaine session — dans l'ordre
+## Si on reprend — contexte soutenance
 
-1. **Vérifier que le CD a rebuildé** les images après feat/security merge
-2. **Tester Docker Hub** : `docker compose up -d` → chat → Ridley Scott ✅
-3. **Tester GHCR** : remplacer images par `ghcr.io/annavitry/horragor-*`
-4. **Test from scratch** : `docker compose down -v && docker compose up -d`
-5. **Merge final** propre avant soutenance
+Le projet est **prêt**. En cas de reprise pour finition :
+- Ajouter `start.sh` + modifs sidebar `frontend/app.py` (fichiers dans les outputs)
+- Potentiellement améliorer le taux de couverture des tests
+- Tout le reste est fonctionnel et validé

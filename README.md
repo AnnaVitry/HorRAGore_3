@@ -168,6 +168,8 @@ docker compose up -d
 
 > **Langfuse** : après création du compte, récupère les clés API et ajoute-les dans `.env`.
 
+> **Alternative GHCR** : remplace les images par `ghcr.io/annavitry/horragor-*:latest`
+
 ### Mode développement local
 
 ```bash
