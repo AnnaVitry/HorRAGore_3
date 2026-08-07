@@ -168,5 +168,6 @@ services:
       - "8501:8501"
     environment:
       API_URL: http://api:8000
+      API_SECRET_KEY: ${API_SECRET_KEY:-}
     networks:
       - horragor-net
